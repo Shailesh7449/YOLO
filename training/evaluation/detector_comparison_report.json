@@ -1,0 +1,31 @@
+{
+  "timestamp": "2026-10-11T19:07:26Z",
+  "test_image": "bus.jpg",
+  "runs": 20,
+  "models": {
+    "baseline_onnx": {
+      "name": "yolo26n.onnx",
+      "latency_ms": 65.7,
+      "fps": 15.22,
+      "detected_persons": 4,
+      "backend": "onnxruntime"
+    },
+    "finetuned_pytorch": {
+      "name": "best_person_detector.pt",
+      "latency_ms": 29.28,
+      "fps": 34.15,
+      "detected_persons": 72,
+      "backend": "ultralytics_pt"
+    },
+    "finetuned_exported_onnx": {
+      "name": "yolo_person_finetuned.onnx",
+      "latency_ms": 99.56,
+      "fps": 10.04,
+      "detected_persons": 150
+    }
+  },
+  "numerical_tolerance": {
+    "max_box_diff_px": -1,
+    "consistent_detections": false
+  }
+}

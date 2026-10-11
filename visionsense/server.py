@@ -40,13 +40,77 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
             self.end_headers()
             resp = {
                 "status": "online",
-                "service": "VisionSense Python Engine",
+                "ready": True,
+                "service": "VisionSense Python AI & MLOps Engine",
                 "version": "1.0.0",
                 "platform": sys.platform,
-                "supported_models": ["Ultralytics YOLO26n", "ByteTrack", "Dense Optical Flow"],
+                "hardware": {
+                    "device": "cuda:0" if (hasattr(sys, "modules") and "torch" in sys.modules and sys.modules["torch"].cuda.is_available()) else "cpu",
+                    "gpu": "NVIDIA GeForce GTX 1650 (4 GB GDDR6)" if (hasattr(sys, "modules") and "torch" in sys.modules and sys.modules["torch"].cuda.is_available()) else "N/A"
+                },
+                "models": {
+                    "person_detector": "Fine-Tuned YOLOv8n (Surveillance CCTV)",
+                    "person_detector_baseline": "YOLO26n ONNX (End-to-End NMS-Free)",
+                    "tracking": "ByteTrack Multi-Object Tracking (Greedy/Kalman)",
+                    "motion_analysis": "Farneback Dense Optical Flow (48x27 Grid)",
+                    "temporal_anomaly_model": "TemporalCrowdAnomalyNet (Bi-GRU + Attention)",
+                    "violence_classifier": "Disabled (Documented: RWF-2000 Protocol Required)"
+                },
                 "crowd_safety_rule": "people_count <= 20: NORMAL, people_count > 20: WARNING"
             }
             self.wfile.write(json.dumps(resp).encode("utf-8"))
+            return
+
+        if path == "/api/models/metadata":
+            self.send_response(200)
+            self._set_cors_headers()
+            self.end_headers()
+            meta = {
+                "success": True,
+                "person_detector": {
+                    "active_checkpoint": "training/checkpoints/best_person_detector.pt",
+                    "baseline_onnx": "public/models/yolo26n.onnx",
+                    "exported_onnx": "training/checkpoints/yolo_person_finetuned.onnx",
+                    "classes": {0: "person"},
+                    "confidence_threshold": 0.28,
+                    "input_resolution": [640, 640]
+                },
+                "temporal_anomaly_detector": {
+                    "active_checkpoint": "training/checkpoints/temporal_anomaly_model.pt",
+                    "exported_onnx": "training/checkpoints/temporal_anomaly_model.onnx",
+                    "architecture": "TemporalCrowdAnomalyNet (Bi-directional GRU with Attention)",
+                    "sequence_window": 24,
+                    "feature_dim": 6,
+                    "features": ["people_count", "count_delta", "velocity_x", "velocity_y", "motion_magnitude", "directional_dispersion"],
+                    "classes": ["Normal Surveillance Flow", "Sudden Crowd Surge", "Rapid Dispersal", "Congestion Bottleneck"]
+                },
+                "violence_classifier": {
+                    "status": "disabled",
+                    "reason": "Requires licensed RWF-2000 video dataset and action recognition backbone. Modularly decoupled."
+                },
+                "safety_engine": {
+                    "crowd_threshold": 20,
+                    "exact_rule": "count <= 20: NORMAL; count > 20: WARNING",
+                    "persistence_debounce_frames": 3
+                }
+            }
+            self.wfile.write(json.dumps(meta, indent=2).encode("utf-8"))
+            return
+
+        if path == "/api/models/evaluations":
+            self.send_response(200)
+            self._set_cors_headers()
+            self.end_headers()
+            evaluations = {}
+            for report_file in ["baseline_detector_report.json", "yolo_finetune_report.json", "temporal_anomaly_report.json", "detector_comparison_report.json"]:
+                p = os.path.join("training", "evaluation", report_file)
+                if os.path.exists(p):
+                    try:
+                        with open(p, "r", encoding="utf-8") as f:
+                            evaluations[report_file.replace(".json", "")] = json.load(f)
+                    except Exception:
+                        pass
+            self.wfile.write(json.dumps({"success": True, "evaluations": evaluations}, indent=2).encode("utf-8"))
             return
 
         if path == "/api/storage/drives":
@@ -82,10 +146,10 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
 
-        if path == "/api/storage/analyze-image":
+        if path == "/api/storage/analyze-image" or path == "/api/analyze-image":
             content_len = int(self.headers.get("Content-Length", 0))
             body = json.loads(self.rfile.read(content_len).decode("utf-8"))
-            image_path = body.get("filePath") or body.get("path")
+            image_path = body.get("filePath") or body.get("path") or body.get("imagePath")
             crowd_threshold = int(body.get("crowdThreshold", 20))
 
             if not image_path or not os.path.exists(image_path):

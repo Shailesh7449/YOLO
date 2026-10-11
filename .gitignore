@@ -59,3 +59,9 @@ logs/
 # App Specific
 uploads/
 public/*.mp4
+runs/
+.pytest_cache/
+datasets/detection/*/images/
+datasets/detection/*/labels/
+datasets/detection/*/*.cache
+datasets/surveillance_anomaly/*/*.npy
