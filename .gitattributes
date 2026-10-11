@@ -1,0 +1,11 @@
+# GitHub Linguist Language Detection Configuration
+# Mark third-party web runtime binaries and bundles as vendored
+public/*.mjs linguist-vendored
+public/*.js linguist-vendored
+public/*.wasm linguist-vendored
+dist/** linguist-vendored
+node_modules/** linguist-vendored
+
+# Ensure Python codebase is properly tracked as primary language
+*.py linguist-detectable=true
+visionsense/** linguist-detectable=true

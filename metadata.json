@@ -1,0 +1,10 @@
+{
+  "name": "VisionSense - AI Security Operations Center",
+  "description": "Commercial-grade AI CCTV Surveillance Operations Center featuring real YOLO person detection, ByteTrack tracking, Lucas-Kanade optical flow, and temporal safety intelligence.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
