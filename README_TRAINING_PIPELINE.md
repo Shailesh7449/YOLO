@@ -12,6 +12,9 @@ The pipeline uses Python 3.12 with PyTorch 2.6.0+cu124 on CUDA 12.4 for NVIDIA G
 # Activate the virtual environment
 .\.venv\Scripts\Activate.ps1
 
+# Install local GPU training dependencies (CUDA 12.4 PyTorch)
+pip install -r requirements-training.txt
+
 # Verify GPU, CUDA, and library detection
 python -c "import torch, ultralytics, onnxruntime; print('PyTorch:', torch.__version__, 'CUDA Available:', torch.cuda.is_available(), 'GPU:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')"
 ```
