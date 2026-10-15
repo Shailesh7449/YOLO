@@ -28,6 +28,7 @@ def analyze_image_file(
 ) -> Dict[str, Any]:
     start_time = time.time()
     detector = YOLOPersonDetector(conf_threshold=conf_threshold)
+    det_meta = detector.get_metadata()
 
     img_w, img_h = 1280, 720
     try:
@@ -70,7 +71,8 @@ def analyze_image_file(
         "crowd_status": crowd_status,
         "crowd_threshold": crowd_threshold,
         "inference_time_ms": inference_ms,
-        "model_used": "Ultralytics YOLO26n (Person Class 0)",
+        "model_used": det_meta["name"],
+        "model_info": det_meta,
         "detections": [d.to_dict() for d in detections],
         "alerts": alerts,
         "analysis_type": "spatial_only",
@@ -112,7 +114,7 @@ def analyze_video_file(
     detector = YOLOPersonDetector()
     tracker = ByteTracker(high_thresh=0.45, low_thresh=0.1)
     optical_flow = DenseOpticalFlow(grid_w=48, grid_h=27)
-    temporal_analysis = TemporalMovementAnalysis(window_size=20)
+    temporal_analysis = TemporalMovementAnalysis(window_size=24)
     safety_engine = SafetyEngine(crowd_threshold=crowd_threshold, persistence_frames=3)
 
     telemetry_frames: List[Dict[str, Any]] = []
@@ -120,11 +122,13 @@ def analyze_video_file(
     processed_count = 0
     start_wall_time = time.time()
     last_timestamp = 0.0
+    is_true_eof = False
 
     while True:
         ret, frame = cap.read()
         if not ret or frame is None:
             # Reached true End-Of-File (EOF)
+            is_true_eof = True
             break
 
         current_timestamp = frame_idx / native_fps
@@ -170,19 +174,26 @@ def analyze_video_file(
     cap.release()
     total_analysis_time = time.time() - start_wall_time
 
-    completion_percentage = 100.0 if (video_duration == 0 or last_timestamp >= video_duration * 0.95) else round((last_timestamp / video_duration) * 100, 1)
+    if is_true_eof:
+        completion_percentage = 100.0
+        status_text = "PROCESSING COMPLETE"
+    else:
+        completion_percentage = round((last_timestamp / video_duration) * 100, 1) if video_duration > 0 else 0.0
+        status_text = "PROCESSING INCOMPLETE"
 
     result = {
         "success": True,
         "filename": os.path.basename(video_path),
         "video_duration_seconds": round(video_duration, 2),
         "last_processed_timestamp": round(last_timestamp, 2),
-        "completion_percentage": 100.0,
-        "status": "PROCESSING COMPLETE",
+        "completion_percentage": completion_percentage,
+        "status": status_text,
         "total_frames_sampled": processed_count,
         "native_fps": round(native_fps, 2),
         "resolution": {"width": video_width, "height": video_height},
         "crowd_threshold": crowd_threshold,
+        "model_info": detector.get_metadata(),
+        "temporal_info": temporal_analysis.get_metadata(),
         "total_alerts": len(safety_engine.alerts_history),
         "alerts_history": [a.to_dict() for a in safety_engine.alerts_history],
         "telemetry_frames_count": len(telemetry_frames),

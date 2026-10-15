@@ -1,0 +1,7 @@
+# VisionSense Surveillance Person Detection Dataset
+path: D:/spidy/YOLO/datasets/detection/surveillance_person
+train: images/train
+val: images/val
+
+names:
+  0: person

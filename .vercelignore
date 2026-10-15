@@ -1,0 +1,21 @@
+# Python virtual environments & caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Python manifests
+requirements*.txt
+pyproject.toml
+uv.lock
+setup.py
+
+# Python backend, training data, and PyTorch checkpoints
+training/
+visionsense/
+datasets/
+tests/
+research_paper_evidence/
+main.py
+*.pt

@@ -1,0 +1,38 @@
+{
+  "dataset_name": "VisionSense-Temporal-Crowd-Anomaly",
+  "version": "1.0.0",
+  "sequence_length": 24,
+  "feature_dim": 6,
+  "features": [
+    "people_count",
+    "count_delta",
+    "velocity_x",
+    "velocity_y",
+    "motion_magnitude",
+    "directional_dispersion"
+  ],
+  "num_classes": 4,
+  "class_names": {
+    "0": "Normal Surveillance Flow",
+    "1": "Sudden Crowd Surge",
+    "2": "Rapid Dispersal / Evacuation",
+    "3": "Congestion Bottleneck"
+  },
+  "train_samples": 37,
+  "val_samples": 13,
+  "train_class_counts": {
+    "0": 24,
+    "1": 7,
+    "2": 1,
+    "3": 5
+  },
+  "val_class_counts": {
+    "0": 6,
+    "1": 4,
+    "2": 1,
+    "3": 2
+  },
+  "leak_prevention": "Strict clip-level partitioning; no frames from same clip appear in both train and val",
+  "random_seed": 42,
+  "manifest_hash": "1107449c56f05f06d894e328843060468ac6d4083e3533e7e64fe4cea0f2c5e0"
+}

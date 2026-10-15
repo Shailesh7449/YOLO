@@ -1,0 +1,84 @@
+{
+  "timestamp": "2026-10-11T18:52:36Z",
+  "model": {
+    "name": "yolo26n.onnx",
+    "path": "D:\\spidy\\YOLO\\public\\models\\yolo26n.onnx",
+    "size_bytes": 9890454,
+    "size_mb": 9.432,
+    "backend": "onnxruntime",
+    "provider": "CPUExecutionProvider",
+    "confidence_threshold": 0.28,
+    "input_resolution": [
+      640,
+      640
+    ]
+  },
+  "hardware": {
+    "cpu": "Intel64 Family 6 Model 165 Stepping 2, GenuineIntel",
+    "ram_total_gb": 15.78
+  },
+  "benchmark_sample": {
+    "file": "bus.jpg",
+    "dimensions": [
+      810,
+      1080
+    ]
+  },
+  "metrics": {
+    "iterations": 30,
+    "mean_latency_ms": 101.31,
+    "std_latency_ms": 14.75,
+    "median_latency_ms": 100.66,
+    "p95_latency_ms": 128.02,
+    "min_latency_ms": 73.13,
+    "max_latency_ms": 134.78,
+    "throughput_fps": 9.87,
+    "peak_memory_mb": 0.11
+  },
+  "sample_detections": [
+    {
+      "bbox": [
+        46.8,
+        398.5,
+        236.7,
+        902.0
+      ],
+      "confidence": 0.914,
+      "class_id": 0,
+      "class_name": "person"
+    },
+    {
+      "bbox": [
+        223.0,
+        405.3,
+        345.2,
+        863.2
+      ],
+      "confidence": 0.901,
+      "class_id": 0,
+      "class_name": "person"
+    },
+    {
+      "bbox": [
+        668.7,
+        390.6,
+        810.0,
+        879.4
+      ],
+      "confidence": 0.848,
+      "class_id": 0,
+      "class_name": "person"
+    },
+    {
+      "bbox": [
+        0.0,
+        556.4,
+        64.7,
+        872.0
+      ],
+      "confidence": 0.544,
+      "class_id": 0,
+      "class_name": "person"
+    }
+  ]
+}

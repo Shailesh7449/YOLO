@@ -56,6 +56,7 @@ class TemporalAnalysisResult:
     anomaly_type: Optional[str]
     confidence: float
     persistence_counter: int
+    model_type: str = "heuristic"
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
