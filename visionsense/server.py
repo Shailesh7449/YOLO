@@ -14,6 +14,8 @@ from visionsense.storage_bridge import (
     get_connected_drives, get_system_shortcuts, browse_directory
 )
 from visionsense.pipeline import analyze_image_file, analyze_video_file
+from visionsense.detector import YOLOPersonDetector
+from visionsense.temporal_analysis import TemporalMovementAnalysis
 
 DEFAULT_PORT = 5050
 
@@ -38,6 +40,28 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self._set_cors_headers()
             self.end_headers()
+            try:
+                detector = YOLOPersonDetector()
+                det_meta = detector.get_metadata()
+            except Exception as e:
+                det_meta = {"name": "Unavailable", "model_path": None, "backend_type": "none", "provider": "N/A"}
+
+            try:
+                temporal = TemporalMovementAnalysis()
+                temp_meta = temporal.get_metadata()
+            except Exception:
+                temp_meta = {"model_type": "heuristic"}
+
+            cuda_avail = False
+            gpu_name = "N/A"
+            try:
+                import torch
+                cuda_avail = torch.cuda.is_available()
+                if cuda_avail:
+                    gpu_name = torch.cuda.get_device_name(0)
+            except Exception:
+                pass
+
             resp = {
                 "status": "online",
                 "ready": True,
@@ -45,15 +69,17 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
                 "version": "1.0.0",
                 "platform": sys.platform,
                 "hardware": {
-                    "device": "cuda:0" if (hasattr(sys, "modules") and "torch" in sys.modules and sys.modules["torch"].cuda.is_available()) else "cpu",
-                    "gpu": "NVIDIA GeForce GTX 1650 (4 GB GDDR6)" if (hasattr(sys, "modules") and "torch" in sys.modules and sys.modules["torch"].cuda.is_available()) else "N/A"
+                    "device": "cuda:0" if cuda_avail else "cpu",
+                    "gpu": gpu_name if cuda_avail else "N/A"
                 },
                 "models": {
-                    "person_detector": "Fine-Tuned YOLOv8n (Surveillance CCTV)",
-                    "person_detector_baseline": "YOLO26n ONNX (End-to-End NMS-Free)",
+                    "person_detector": det_meta["name"],
+                    "person_detector_checkpoint": det_meta["model_path"],
+                    "person_detector_backend": det_meta["backend_type"],
+                    "person_detector_provider": det_meta.get("provider", "CPU"),
                     "tracking": "ByteTrack Multi-Object Tracking (Greedy/Kalman)",
                     "motion_analysis": "Farneback Dense Optical Flow (48x27 Grid)",
-                    "temporal_anomaly_model": "TemporalCrowdAnomalyNet (Bi-GRU + Attention)",
+                    "temporal_anomaly_model": f"TemporalCrowdAnomalyNet ({temp_meta.get('model_type', 'heuristic')})",
                     "violence_classifier": "Disabled (Documented: RWF-2000 Protocol Required)"
                 },
                 "crowd_safety_rule": "people_count <= 20: NORMAL, people_count > 20: WARNING"
@@ -65,24 +91,44 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self._set_cors_headers()
             self.end_headers()
+
+            try:
+                detector = YOLOPersonDetector()
+                det_meta = detector.get_metadata()
+            except Exception as e:
+                det_meta = {"name": "Unavailable", "model_path": None, "backend_type": "none", "architecture": "none", "conf_threshold": 0.28, "input_resolution": [640, 640]}
+
+            try:
+                temporal = TemporalMovementAnalysis()
+                temp_meta = temporal.get_metadata()
+            except Exception:
+                temp_meta = {"model_type": "heuristic", "window_size": 24, "classes": ["Normal", "Surge", "Dispersal", "Congestion"]}
+
             meta = {
                 "success": True,
                 "person_detector": {
-                    "active_checkpoint": "training/checkpoints/best_person_detector.pt",
+                    "active_checkpoint": det_meta["model_path"],
+                    "active_model_name": det_meta["name"],
+                    "active_backend": det_meta["backend_type"],
+                    "active_architecture": det_meta.get("architecture", "yolov10_nms_free"),
                     "baseline_onnx": "public/models/yolo26n.onnx",
-                    "exported_onnx": "training/checkpoints/yolo_person_finetuned.onnx",
+                    "finetuned_candidate_pt": "training/checkpoints/best_person_detector.pt",
+                    "finetuned_candidate_onnx": "training/checkpoints/yolo_person_finetuned.onnx",
+                    "candidate_status": "evaluated_baseline_active",
                     "classes": {0: "person"},
-                    "confidence_threshold": 0.28,
-                    "input_resolution": [640, 640]
+                    "confidence_threshold": det_meta.get("conf_threshold", 0.28),
+                    "input_resolution": det_meta.get("input_resolution", [640, 640])
                 },
                 "temporal_anomaly_detector": {
                     "active_checkpoint": "training/checkpoints/temporal_anomaly_model.pt",
                     "exported_onnx": "training/checkpoints/temporal_anomaly_model.onnx",
                     "architecture": "TemporalCrowdAnomalyNet (Bi-directional GRU with Attention)",
-                    "sequence_window": 24,
+                    "active_inference_engine": temp_meta.get("model_type", "heuristic"),
+                    "sequence_window": temp_meta.get("window_size", 24),
                     "feature_dim": 6,
                     "features": ["people_count", "count_delta", "velocity_x", "velocity_y", "motion_magnitude", "directional_dispersion"],
-                    "classes": ["Normal Surveillance Flow", "Sudden Crowd Surge", "Rapid Dispersal", "Congestion Bottleneck"]
+                    "classes": temp_meta.get("classes", ["Normal", "Surge", "Dispersal", "Congestion"]),
+                    "evaluation_note": "Validation accuracy on small benchmark does not guarantee general domain performance."
                 },
                 "violence_classifier": {
                     "status": "disabled",
