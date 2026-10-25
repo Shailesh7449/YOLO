@@ -10,6 +10,9 @@ export interface TrackedObject {
   direction: string; // 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW'
   is_stationary: boolean;
   history?: Array<[number, number]>;
+  is_violence_participant?: boolean;
+  participant_role?: 'PARTICIPANT' | 'BYSTANDER' | 'POTENTIAL VIOLENCE PARTICIPANT' | string;
+  violence_association_conf?: number;
 }
 
 export type RawDetection = [number, number, number, number, number, number]; // [x1, y1, x2, y2, conf, cls]
@@ -21,6 +24,7 @@ export type RawDetection = [number, number, number, number, number, number]; // 
  */
 export type CrowdSafetyStatus = 'NORMAL' | 'WARNING';
 export type MovementSafetyStatus = 'NORMAL' | 'ELEVATED' | 'HIGH_SURGE' | 'RAPID_DISPERSAL' | 'STAGNATION';
+export type ViolenceEventState = 'ANALYZING' | 'NORMAL' | 'POSSIBLE' | 'CONFIRMED' | 'CLEARED';
 
 export interface OpticalFlowVector {
   x: number;
@@ -52,8 +56,10 @@ export interface ViolencePrediction {
   source_id: string;
   model_name: string;
   model_version?: string;
-  status: 'SUCCESS' | 'ERROR';
+  status: 'SUCCESS' | 'ERROR' | 'ANALYZING';
   latency_ms?: number;
+  event_state?: ViolenceEventState;
+  participant_track_ids?: number[];
 }
 
 export interface VisionSenseAlert {
@@ -65,6 +71,8 @@ export interface VisionSenseAlert {
   frame: number;
   peopleCount: number;
   motionScore: number;
+  participantTrackIds?: number[];
+  eventId?: string;
 }
 
 export interface FrameTelemetry {
@@ -79,6 +87,9 @@ export interface FrameTelemetry {
   optical_flow?: OpticalFlowResult;
   alerts: VisionSenseAlert[];
   violence_prediction?: ViolencePrediction;
+  violence_status?: ViolenceEventState;
+  violence_event_id?: string | null;
+  violence_participants?: number[];
 }
 
 export type PlaybackState = 'PLAYING' | 'PAUSED' | 'COMPLETED';

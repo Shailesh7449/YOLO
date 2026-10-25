@@ -16,7 +16,9 @@ import numpy as np
 # Default checkpoint paths
 DEFAULT_X3D_PT = os.path.abspath("training/checkpoints/violence_x3d_realtime.pt")
 DEFAULT_X3D_ONNX = os.path.abspath("training/checkpoints/violence_x3d_realtime.onnx")
-DEFAULT_R2PLUS1D_PT = os.path.abspath("training/checkpoints/violence_r2plus1d_best.pt")
+DEFAULT_R2PLUS1D_FINETUNED = os.path.abspath("training/checkpoints/violence_r2plus1d_finetuned.pt")
+DEFAULT_R2PLUS1D_BEST = os.path.abspath("training/checkpoints/violence_r2plus1d_best.pt")
+DEFAULT_R2PLUS1D_PT = DEFAULT_R2PLUS1D_FINETUNED if os.path.exists(DEFAULT_R2PLUS1D_FINETUNED) else DEFAULT_R2PLUS1D_BEST
 
 # Standard normalization constants (RWF-2000 / Kinetics standard)
 NORM_MEAN = np.array([0.45, 0.45, 0.45], dtype=np.float32)
@@ -33,11 +35,15 @@ class ViolencePrediction:
         start_timestamp: float,
         end_timestamp: float,
         source_id: str = "camera_stream",
-        model_name: str = "X3D-M Realtime (RWF-2000 Fine-Tuned)",
-        model_version: str = "v1.0.0",
+        model_name: str = "R(2+1)D-18 Fine-Tuned (RWF-2000)",
+        model_version: str = "v1.1.0",
         status: str = "SUCCESS",
         error_details: Optional[str] = None,
-        latency_ms: float = 0.0
+        latency_ms: float = 0.0,
+        event_state: str = "NORMAL",
+        motion_diff: float = 0.0,
+        participant_track_ids: Optional[List[int]] = None,
+        proximity_cluster: bool = False
     ):
         self.label = label  # "VIOLENCE" or "NON_VIOLENCE"
         self.is_violence = is_violence
@@ -50,6 +56,10 @@ class ViolencePrediction:
         self.status = status
         self.error_details = error_details
         self.latency_ms = float(latency_ms)
+        self.event_state = event_state  # "ANALYZING" | "NORMAL" | "POSSIBLE" | "CONFIRMED" | "CLEARED"
+        self.motion_diff = float(motion_diff)
+        self.participant_track_ids = participant_track_ids or []
+        self.proximity_cluster = proximity_cluster
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -63,7 +73,11 @@ class ViolencePrediction:
             "model_version": self.model_version,
             "status": self.status,
             "error_details": self.error_details,
-            "latency_ms": round(self.latency_ms, 2)
+            "latency_ms": round(self.latency_ms, 2),
+            "event_state": self.event_state,
+            "motion_diff": round(self.motion_diff, 2),
+            "participant_track_ids": self.participant_track_ids,
+            "proximity_cluster": self.proximity_cluster
         }
 
 
@@ -275,14 +289,102 @@ class ViolenceDetector:
         tensor_np = np.transpose(arr, (3, 0, 1, 2))[np.newaxis, ...]
         return tensor_np
 
+    def compute_kinetic_motion(self, frames: List[np.ndarray]) -> float:
+        """
+        Calculates average inter-frame pixel intensity displacement across the temporal window.
+        Suppresses false activations on static frames, frozen feeds, or non-moving postures.
+        """
+        import cv2
+        if len(frames) < 2:
+            return 0.0
+        diffs = []
+        step = max(1, len(frames) // 16)
+        for i in range(step, len(frames), step):
+            prev_f = frames[i - step]
+            curr_f = frames[i]
+            if prev_f is None or curr_f is None:
+                continue
+            g_prev = cv2.cvtColor(prev_f, cv2.COLOR_BGR2GRAY) if len(prev_f.shape) == 3 else prev_f
+            g_curr = cv2.cvtColor(curr_f, cv2.COLOR_BGR2GRAY) if len(curr_f.shape) == 3 else curr_f
+            if g_prev.shape != (112, 112):
+                g_prev = cv2.resize(g_prev, (112, 112))
+                g_curr = cv2.resize(g_curr, (112, 112))
+            diffs.append(float(np.mean(np.abs(g_curr.astype(np.float32) - g_prev.astype(np.float32)))))
+        return float(np.mean(diffs)) if diffs else 0.0
+
+    def associate_participants(
+        self,
+        tracks: Optional[List[Dict[str, Any]]],
+        is_violence_candidate: bool
+    ) -> Tuple[List[int], List[Dict[str, Any]]]:
+        """
+        Associates person tracks with a violence event based on spatial proximity and bounding box overlap.
+        Tracks in close physical contact (<220px or IoU > 0.05) are flagged as participants.
+        Bystanders / distant persons remain normal.
+        """
+        if not tracks:
+            return [], []
+
+        if not is_violence_candidate:
+            normal_tracks = []
+            for t in tracks:
+                tc = dict(t)
+                tc["is_violence_participant"] = False
+                tc["participant_role"] = "BYSTANDER"
+                tc["violence_association_conf"] = 0.0
+                normal_tracks.append(tc)
+            return [], normal_tracks
+
+        participant_ids = set()
+        n = len(tracks)
+        for i in range(n):
+            b1 = tracks[i].get("bbox", [0, 0, 0, 0])
+            c1 = tracks[i].get("centroid", [(b1[0] + b1[2]) / 2, (b1[1] + b1[3]) / 2])
+            for j in range(i + 1, n):
+                b2 = tracks[j].get("bbox", [0, 0, 0, 0])
+                c2 = tracks[j].get("centroid", [(b2[0] + b2[2]) / 2, (b2[1] + b2[3]) / 2])
+
+                dist = np.hypot(c1[0] - c2[0], c1[1] - c2[1])
+
+                ix1 = max(b1[0], b2[0])
+                iy1 = max(b1[1], b2[1])
+                ix2 = min(b1[2], b2[2])
+                iy2 = min(b1[3], b2[3])
+                inter_area = max(0, ix2 - ix1) * max(0, iy2 - iy1)
+                a1 = (b1[2] - b1[0]) * (b1[3] - b1[1])
+                a2 = (b2[2] - b2[0]) * (b2[3] - b2[1])
+                union_area = a1 + a2 - inter_area
+                iou = (inter_area / union_area) if union_area > 0 else 0.0
+
+                if dist < 220.0 or iou > 0.05:
+                    participant_ids.add(tracks[i].get("track_id"))
+                    participant_ids.add(tracks[j].get("track_id"))
+
+        updated_tracks = []
+        for t in tracks:
+            tc = dict(t)
+            tid = t.get("track_id")
+            if tid in participant_ids:
+                tc["is_violence_participant"] = True
+                tc["participant_role"] = "POTENTIAL VIOLENCE PARTICIPANT"
+                tc["violence_association_conf"] = 0.90
+            else:
+                tc["is_violence_participant"] = False
+                tc["participant_role"] = "BYSTANDER"
+                tc["violence_association_conf"] = 0.10
+            updated_tracks.append(tc)
+
+        return list(participant_ids), updated_tracks
+
     def predict_clip(
         self,
         frames: List[np.ndarray],
         timestamps: Optional[List[float]] = None,
-        source_id: str = "camera_stream"
+        source_id: str = "camera_stream",
+        tracks: Optional[List[Dict[str, Any]]] = None
     ) -> ViolencePrediction:
         """
-        Executes action recognition on an exact temporal window of frames.
+        Executes action recognition on an exact temporal window of frames with kinetic and proximity gating.
         """
         if timestamps is None:
             timestamps = [float(i) * 0.04 for i in range(len(frames))]
@@ -296,17 +398,16 @@ class ViolenceDetector:
                 source_id=source_id,
                 model_name=self.model_name,
                 status="ERROR",
-                error_details=f"Model not initialized: {self.init_error}"
+                error_details=f"Model not initialized: {self.init_error}",
+                event_state="NORMAL"
             )
 
         if len(frames) < self.num_frames:
-            # Pad with last frame if needed
             last_frame = frames[-1] if frames else np.zeros((*self.frame_size, 3), dtype=np.uint8)
             frames = list(frames) + [last_frame] * (self.num_frames - len(frames))
             last_ts = timestamps[-1] if timestamps else 0.0
             timestamps = list(timestamps) + [last_ts] * (self.num_frames - len(timestamps))
         elif len(frames) > self.num_frames:
-            # Uniformly subsample down to required count
             idx = np.linspace(0, len(frames) - 1, self.num_frames).astype(int)
             frames = [frames[i] for i in idx]
             timestamps = [timestamps[i] for i in idx]
@@ -315,41 +416,57 @@ class ViolenceDetector:
         end_ts = timestamps[-1] if timestamps else start_ts
 
         t0 = time.perf_counter()
+        motion_diff = self.compute_kinetic_motion(frames)
         tensor_np = self.preprocess_frames(frames)
 
         try:
             if self.onnx_session is not None:
-                # ONNX Runtime execution
                 onnx_out = self.onnx_session.run(["logits"], {"video_input": tensor_np})[0]
-                # Softmax
                 exp_logits = np.exp(onnx_out - np.max(onnx_out, axis=1, keepdims=True))
                 probs = (exp_logits / np.sum(exp_logits, axis=1, keepdims=True))[0]
             else:
-                # PyTorch execution
                 import torch
                 tensor = torch.from_numpy(tensor_np).to(self.device)
                 with torch.no_grad():
                     logits = self.model(tensor)
                     probs = torch.softmax(logits, dim=1).cpu().numpy()[0]
 
-            # RWF-2000 convention: Index 0 is Fight (Violence), Index 1 is NonFight (Non-Violence)
-            p_violence = float(probs[0])
-            p_non_violence = float(probs[1])
+            # RWF-2000 convention: Index 0 is Fight (Violence), Index 1 is NonFight
+            raw_p_violence = float(probs[0])
+
+            # Kinetic Gating: Suppress static frame false positives
+            if motion_diff < 2.8:
+                calibrated_violence = raw_p_violence * min(1.0, motion_diff / 3.0)
+            else:
+                calibrated_violence = raw_p_violence
+
+            participant_ids, _ = self.associate_participants(
+                tracks,
+                is_violence_candidate=(calibrated_violence >= self.confidence_threshold)
+            )
+
+            has_proximity = bool(participant_ids) if (tracks and len(tracks) >= 2) else True
+
+            is_violent = (calibrated_violence >= self.confidence_threshold) and (motion_diff >= 2.8) and has_proximity
+            label = "VIOLENCE" if is_violent else "NON_VIOLENCE"
+            event_state = "CONFIRMED" if is_violent else ("POSSIBLE" if (raw_p_violence >= self.confidence_threshold and motion_diff >= 2.5) else "NORMAL")
 
             latency_ms = (time.perf_counter() - t0) * 1000
-            is_violent = p_violence >= self.confidence_threshold
-            label = "VIOLENCE" if is_violent else "NON_VIOLENCE"
 
             return ViolencePrediction(
                 label=label,
                 is_violence=is_violent,
-                confidence=p_violence,
+                confidence=calibrated_violence,
                 start_timestamp=start_ts,
                 end_timestamp=end_ts,
                 source_id=source_id,
                 model_name=self.model_name,
                 status="SUCCESS",
-                latency_ms=latency_ms
+                latency_ms=latency_ms,
+                event_state=event_state,
+                motion_diff=motion_diff,
+                participant_track_ids=participant_ids,
+                proximity_cluster=bool(participant_ids)
             )
 
         except Exception as e:
@@ -363,7 +480,8 @@ class ViolenceDetector:
                 model_name=self.model_name,
                 status="ERROR",
                 error_details=str(e),
-                latency_ms=(time.perf_counter() - t0) * 1000
+                latency_ms=(time.perf_counter() - t0) * 1000,
+                event_state="NORMAL"
             )
 
     def ingest_stream_frame(

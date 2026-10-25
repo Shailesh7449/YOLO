@@ -555,13 +555,16 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
               ctx.shadowOffsetX = 2;
               ctx.shadowOffsetY = 2;
 
-              // Primary boundary stroke (Electric Cyan)
-              const boxColor = '#00f0ff';
+              // Automatic Red/Blue Person Tracking:
+              // Blue (#00f0ff) for normal tracked persons; Red (#ef4444) for confirmed violence participants
+              const isParticipant = Boolean(track.is_violence_participant);
+              const boxColor = isParticipant ? '#ef4444' : '#00f0ff';
+              const cornerColor = isParticipant ? '#f87171' : '#38bdf8';
               ctx.strokeStyle = boxColor;
               ctx.lineWidth = visualConfig.box_thickness || 1.8;
 
               // Semi-transparent tactical fill
-              ctx.fillStyle = 'rgba(0, 240, 255, 0.07)';
+              ctx.fillStyle = isParticipant ? 'rgba(239, 68, 68, 0.16)' : 'rgba(0, 240, 255, 0.07)';
               ctx.fillRect(drawX1, drawY1, drawW, drawH);
 
               // Main rectangle
@@ -570,7 +573,7 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
               // Military / Comic Corner Brackets
               const cornerLen = Math.min(14, drawW / 3, drawH / 3);
               ctx.lineWidth = (visualConfig.box_thickness || 1.8) + 1.6;
-              ctx.strokeStyle = '#38bdf8'; // Sky cyan highlight
+              ctx.strokeStyle = cornerColor;
 
               // Top-Left Corner
               ctx.beginPath();
@@ -604,7 +607,7 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
               if (track.centroid) {
                 const cx = offsetX + track.centroid[0] * scaleX;
                 const cy = offsetY + track.centroid[1] * scaleY;
-                ctx.strokeStyle = 'rgba(217, 70, 239, 0.6)'; // Magenta target
+                ctx.strokeStyle = isParticipant ? 'rgba(239, 68, 68, 0.8)' : 'rgba(217, 70, 239, 0.6)';
                 ctx.lineWidth = 1;
                 ctx.beginPath();
                 ctx.moveTo(cx - 5, cy);
@@ -619,9 +622,9 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
                 ctx.save();
                 ctx.globalAlpha = popOpacity;
 
-                const label = `PERSON #${track.track_id}${
-                  visualConfig.show_confidence ? ` ${(track.confidence * 100).toFixed(0)}%` : ''
-                }`;
+                const label = isParticipant
+                  ? `VIOLENCE PARTICIPANT #${track.track_id}${visualConfig.show_confidence ? ` ${(track.confidence * 100).toFixed(0)}%` : ''}`
+                  : `PERSON #${track.track_id}${visualConfig.show_confidence ? ` ${(track.confidence * 100).toFixed(0)}%` : ''}`;
                 ctx.font = '700 10px "JetBrains Mono", monospace';
                 const textMetrics = ctx.measureText(label);
                 const badgeW = textMetrics.width + 12;
@@ -634,21 +637,21 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
                 ctx.fillRect(badgeX + 2, badgeY + 2, badgeW * popScale, badgeH * popScale);
 
                 // Badge Background (Deep Midnight with Electric Border)
-                ctx.fillStyle = '#080c16';
+                ctx.fillStyle = isParticipant ? '#2b0707' : '#080c16';
                 ctx.fillRect(badgeX, badgeY, badgeW * popScale, badgeH * popScale);
 
-                ctx.strokeStyle = '#00f0ff';
+                ctx.strokeStyle = isParticipant ? '#ef4444' : '#00f0ff';
                 ctx.lineWidth = 1.2;
                 ctx.strokeRect(badgeX, badgeY, badgeW * popScale, badgeH * popScale);
 
                 // Target status dot inside pill
-                ctx.fillStyle = '#00f0ff';
+                ctx.fillStyle = isParticipant ? '#ef4444' : '#00f0ff';
                 ctx.beginPath();
                 ctx.arc(badgeX + 6, badgeY + badgeH / 2, 2.5, 0, Math.PI * 2);
                 ctx.fill();
 
                 // Text
-                ctx.fillStyle = '#f8fafc';
+                ctx.fillStyle = isParticipant ? '#fca5a5' : '#f8fafc';
                 ctx.fillText(label, badgeX + 12, badgeY + 12);
 
                 ctx.restore();

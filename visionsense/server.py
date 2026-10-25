@@ -120,6 +120,8 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
             except Exception:
                 temp_meta = {"model_type": "heuristic", "window_size": 24, "classes": ["Normal", "Surge", "Dispersal", "Congestion"]}
 
+            v_detector = get_violence_detector()
+
             meta = {
                 "success": True,
                 "person_detector": {
@@ -148,15 +150,16 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
                 },
                 "violence_classifier": {
                     "status": "ready" if (v_detector and v_detector.is_ready) else "loading",
-                    "active_model_name": v_detector.model_name if v_detector else "R(2+1)D-18 High-Accuracy (RWF-2000)",
+                    "active_model_name": v_detector.model_name if v_detector else "R(2+1)D-18 Fine-Tuned (RWF-2000)",
                     "active_backend": v_detector.backend_type if v_detector else "pytorch_cuda",
-                    "architecture": "3D CNN (R(2+1)D-18 / X3D-M Spatio-Temporal Video Action Recognition)",
-                    "dataset": "RWF-2000 Benchmark (Real-World Fight)",
+                    "architecture": "3D CNN (R(2+1)D-18 Spatio-Temporal Video Action Recognition with Multimodal Gating)",
+                    "dataset": "RWF-2000 + AIRTLAB Surveillance Action Dataset",
                     "num_frames": v_detector.num_frames if v_detector else 32,
                     "confidence_threshold": v_detector.confidence_threshold if v_detector else 0.50,
                     "license": "MIT License (visionlab-ai/school-violence-detection-models)",
                     "checkpoints": {
-                        "r2plus1d_pt": "training/checkpoints/violence_r2plus1d_best.pt",
+                        "r2plus1d_finetuned_pt": "training/checkpoints/violence_r2plus1d_finetuned.pt",
+                        "r2plus1d_best_baseline_pt": "training/checkpoints/violence_r2plus1d_best.pt",
                         "x3d_pt": "training/checkpoints/violence_x3d_realtime.pt",
                         "x3d_onnx": "training/checkpoints/violence_x3d_realtime.onnx"
                     }
@@ -278,6 +281,8 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
             base64_frames = body.get("frames") or body.get("frames_b64")
             source_id = body.get("source_id", "live_stream")
             timestamps = body.get("timestamps", [])
+            tracks = body.get("tracks", [])
+            segment = body.get("segment")
 
             v_detector = get_violence_detector()
             if not v_detector or not v_detector.is_ready:
@@ -294,12 +299,21 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
                 total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
                 fps_val = cap.get(cv2.CAP_PROP_FPS) or 30.0
 
-                if total_frames > v_detector.num_frames:
-                    sampled_indices = np.linspace(0, total_frames - 1, v_detector.num_frames).astype(int)
+                start_idx = 0
+                end_idx = total_frames - 1
+                if segment and len(segment) == 2:
+                    start_idx = max(0, int(segment[0] * fps_val))
+                    end_idx = min(total_frames - 1, int(segment[1] * fps_val))
+                    if end_idx <= start_idx:
+                        end_idx = total_frames - 1
+
+                n_target = v_detector.num_frames
+                if (end_idx - start_idx + 1) > n_target:
+                    sampled_indices = np.linspace(start_idx, end_idx, n_target).astype(int)
                     sampled_set = set(sampled_indices)
                     frame_dict = {}
                     f_idx = 0
-                    while True:
+                    while f_idx <= end_idx:
                         ret, f = cap.read()
                         if not ret:
                             break
@@ -320,20 +334,26 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
                     frames = []
                     f_times = []
                     f_idx = 0
-                    while True:
+                    while f_idx <= end_idx:
                         ret, f = cap.read()
                         if not ret or f is None:
                             break
-                        frames.append(f)
-                        f_times.append(float(f_idx / fps_val))
+                        if f_idx >= start_idx:
+                            frames.append(f)
+                            f_times.append(float(f_idx / fps_val))
                         f_idx += 1
                     cap.release()
 
-                pred = v_detector.predict_clip(frames, f_times, source_id=source_id)
+                pred = v_detector.predict_clip(frames, f_times, source_id=source_id, tracks=tracks)
+                _, updated_tracks = v_detector.associate_participants(tracks, is_violence_candidate=pred.is_violence)
                 self.send_response(200)
                 self._set_cors_headers()
                 self.end_headers()
-                self.wfile.write(json.dumps({"success": True, "prediction": pred.to_dict()}).encode("utf-8"))
+                self.wfile.write(json.dumps({
+                    "success": True,
+                    "prediction": pred.to_dict(),
+                    "tracks": updated_tracks
+                }).encode("utf-8"))
                 return
 
             elif base64_frames and isinstance(base64_frames, list):
@@ -356,11 +376,16 @@ class VisionSenseHTTPHandler(BaseHTTPRequestHandler):
                 if len(timestamps) != len(frames):
                     timestamps = [i * 0.1 for i in range(len(frames))]
 
-                pred = v_detector.predict_clip(frames, timestamps, source_id=source_id)
+                pred = v_detector.predict_clip(frames, timestamps, source_id=source_id, tracks=tracks)
+                _, updated_tracks = v_detector.associate_participants(tracks, is_violence_candidate=pred.is_violence)
                 self.send_response(200)
                 self._set_cors_headers()
                 self.end_headers()
-                self.wfile.write(json.dumps({"success": True, "prediction": pred.to_dict()}).encode("utf-8"))
+                self.wfile.write(json.dumps({
+                    "success": True,
+                    "prediction": pred.to_dict(),
+                    "tracks": updated_tracks
+                }).encode("utf-8"))
                 return
 
             self.send_response(400)

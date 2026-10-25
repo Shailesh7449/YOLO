@@ -83,6 +83,7 @@ export const LiveCameraView: React.FC<LiveCameraViewProps> = ({
   const frameSnapshotsRef = useRef<string[]>([]);
   const lastViolenceCheckTimeRef = useRef<number>(0);
   const offscreenCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const activeParticipantIdsRef = useRef<Set<number>>(new Set());
 
   // Enumerate video devices on mount
   const refreshDevices = useCallback(async () => {
@@ -272,7 +273,14 @@ export const LiveCameraView: React.FC<LiveCameraViewProps> = ({
 
           // 3. Update ByteTrack multi-object tracker
           const tracked = trackerRef.current.update(filteredRaw);
-          setActiveTracks(tracked);
+          const tracksWithParticipants = tracked.map((t) => ({
+            ...t,
+            is_violence_participant: activeParticipantIdsRef.current.has(t.track_id),
+            participant_role: activeParticipantIdsRef.current.has(t.track_id)
+              ? 'POTENTIAL VIOLENCE PARTICIPANT'
+              : 'BYSTANDER',
+          }));
+          setActiveTracks(tracksWithParticipants);
 
           // 4. Exact Crowd Safety Rule: <= 20 NORMAL (Green), > 20 WARNING (Amber)
           const currentCount = tracked.length;
@@ -366,6 +374,11 @@ export const LiveCameraView: React.FC<LiveCameraViewProps> = ({
                 frames: sampleFrames,
                 source_id: streamSourceId,
                 timestamps: sampleFrames.map((_, idx) => nowSec - (16 - idx) * 0.15),
+                tracks: activeTracks.map((t) => ({
+                  track_id: t.track_id,
+                  bbox: t.bbox,
+                  centroid: t.centroid,
+                })),
               }),
             })
               .then((r) => r.json())
@@ -377,6 +390,17 @@ export const LiveCameraView: React.FC<LiveCameraViewProps> = ({
 
                   if (pred.is_violence) {
                     setViolenceStatus('DETECTED');
+                    activeParticipantIdsRef.current = new Set(pred.participant_track_ids || []);
+                    setActiveTracks((prev) =>
+                      prev.map((t) => ({
+                        ...t,
+                        is_violence_participant: activeParticipantIdsRef.current.has(t.track_id),
+                        participant_role: activeParticipantIdsRef.current.has(t.track_id)
+                          ? 'POTENTIAL VIOLENCE PARTICIPANT'
+                          : 'BYSTANDER',
+                      }))
+                    );
+
                     const vSecEvent = notificationService.evaluateViolenceIncident(
                       streamSourceId,
                       streamLabel,
@@ -395,12 +419,21 @@ export const LiveCameraView: React.FC<LiveCameraViewProps> = ({
                         frame: frameStride,
                         peopleCount: currentCount,
                         motionScore: 0.85,
+                        participantTrackIds: pred.participant_track_ids,
                       };
                       setRecentLiveAlerts((prev) => [vAlert, ...prev.slice(0, 19)]);
                       if (onAlertTriggered) onAlertTriggered(vAlert);
                     }
                   } else {
                     setViolenceStatus('NORMAL');
+                    activeParticipantIdsRef.current.clear();
+                    setActiveTracks((prev) =>
+                      prev.map((t) => ({
+                        ...t,
+                        is_violence_participant: false,
+                        participant_role: 'BYSTANDER',
+                      }))
+                    );
                     notificationService.evaluateViolenceIncident(
                       streamSourceId,
                       streamLabel,
@@ -427,8 +460,10 @@ export const LiveCameraView: React.FC<LiveCameraViewProps> = ({
           const boxW = x2 - x1;
           const boxH = y2 - y1;
           const isWarning = crowdStatus === 'WARNING';
-          const primaryColor = isWarning ? '#f59e0b' : '#06b6d4'; // Amber or Cyan
-          const badgeBg = isWarning ? 'rgba(245, 158, 11, 0.9)' : 'rgba(6, 182, 212, 0.9)';
+          const isParticipant = Boolean(track.is_violence_participant);
+          // Automatic Red/Blue Person Tracking: Red (#ef4444) for violent participant, Cyan/Blue (#06b6d4) for normal
+          const primaryColor = isParticipant ? '#ef4444' : (isWarning ? '#f59e0b' : '#06b6d4');
+          const badgeBg = isParticipant ? 'rgba(239, 68, 68, 0.95)' : (isWarning ? 'rgba(245, 158, 11, 0.9)' : 'rgba(6, 182, 212, 0.9)');
 
           // Trajectory trails
           if (showTrails && track.history && track.history.length > 1) {
@@ -453,7 +488,7 @@ export const LiveCameraView: React.FC<LiveCameraViewProps> = ({
 
             // Corner brackets
             const cornerLen = Math.min(12, boxW / 4, boxH / 4);
-            ctx.strokeStyle = '#ffffff';
+            ctx.strokeStyle = isParticipant ? '#fca5a5' : '#ffffff';
             ctx.lineWidth = 2;
             // Top-left
             ctx.beginPath();
@@ -471,7 +506,9 @@ export const LiveCameraView: React.FC<LiveCameraViewProps> = ({
 
           // Identification & Confidence Badge
           if (showIds) {
-            const labelText = `ID #${track.track_id} | ${Math.round(track.confidence * 100)}%`;
+            const labelText = isParticipant
+              ? `VIOLENCE PARTICIPANT #${track.track_id} | ${Math.round(track.confidence * 100)}%`
+              : `ID #${track.track_id} | ${Math.round(track.confidence * 100)}%`;
             ctx.font = 'bold 11px JetBrains Mono, monospace';
             const textMetrics = ctx.measureText(labelText);
             const badgeW = textMetrics.width + 10;
@@ -480,7 +517,7 @@ export const LiveCameraView: React.FC<LiveCameraViewProps> = ({
             ctx.fillStyle = badgeBg;
             ctx.fillRect(x1, Math.max(0, y1 - badgeH), badgeW, badgeH);
 
-            ctx.fillStyle = '#000000';
+            ctx.fillStyle = '#ffffff';
             ctx.fillText(labelText, x1 + 5, Math.max(12, y1 - 4));
           }
         }

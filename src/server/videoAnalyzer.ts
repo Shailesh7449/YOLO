@@ -21,6 +21,9 @@ export interface ServerTrackedObject {
   direction: string;
   is_stationary: boolean;
   history?: Array<[number, number]>;
+  is_violence_participant?: boolean;
+  participant_role?: string;
+  violence_association_conf?: number;
 }
 
 export interface ServerFrameTelemetry {
@@ -41,8 +44,20 @@ export interface ServerFrameTelemetry {
     frame: number;
     peopleCount: number;
     motionScore: number;
+    participantTrackIds?: number[];
+    eventId?: string;
   }>;
   violence_prediction?: any;
+  violence_status?: 'ANALYZING' | 'NORMAL' | 'POSSIBLE' | 'CONFIRMED' | 'CLEARED';
+  violence_event_id?: string | null;
+  violence_participants?: number[];
+}
+
+function formatTimestampMinutes(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 10);
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms}`;
 }
 
 export interface VideoAnalysisResult {
@@ -291,27 +306,15 @@ export async function analyzeVideoServerSide(
   let peakPeople = 0;
   let lastCrowdAlertTime = -10;
   let lastSurgeAlertTime = -10;
-  let violenceAlertTriggered = false;
 
-  // Clip violence assessment via Python AI engine (R(2+1)D-18 / X3D-M)
-  let clipViolencePrediction: any = null;
-  try {
-    const vRes = await fetch('http://127.0.0.1:5050/api/violence/predict', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoPath, source_id: filename }),
-      signal: AbortSignal.timeout(12000),
-    });
-    if (vRes.ok) {
-      const vData = await vRes.json();
-      clipViolencePrediction = vData?.prediction || null;
-      if (clipViolencePrediction?.is_violence) {
-        console.log(`[VideoAnalyzer] Physical violence confirmed in ${filename}: confidence ${(clipViolencePrediction.confidence * 100).toFixed(1)}%`);
-      }
-    }
-  } catch (err: any) {
-    console.log(`[VideoAnalyzer] Violence assessment skipped: ${err?.message}`);
-  }
+  // Evidence-Based Temporal Violence Event State Machine
+  let violenceState: 'ANALYZING' | 'NORMAL' | 'POSSIBLE' | 'CONFIRMED' | 'CLEARED' = 'ANALYZING';
+  let consecutiveViolentWindows = 0;
+  let consecutiveNormalWindows = 0;
+  let activeViolenceEventId: string | null = null;
+  let lastViolenceEvalTime = -10;
+  let activeParticipantTrackIds = new Set<number>();
+  let lastViolencePrediction: any = null;
 
   // Initialize production ByteTracker (Kalman filtering + two-stage IoU association)
   const tracker = new ByteTracker(0.20, 0.35, 0.30, 30, 1);
@@ -621,20 +624,128 @@ export async function analyzeVideoServerSide(
         allAlerts.push(alert);
       }
 
-      if (clipViolencePrediction?.is_violence && !violenceAlertTriggered) {
-        violenceAlertTriggered = true;
-        const vAlert = {
-          id: `alert-violence-${frameIndex}`,
-          type: 'VIOLENCE_DETECTED' as const,
-          severity: 'CRITICAL' as const,
-          message: `CRITICAL ALERT: Physical Altercation/Violence Detected (${(clipViolencePrediction.confidence * 100).toFixed(1)}% conf, ${clipViolencePrediction.model_name})`,
-          timestamp: targetTime,
-          frame: frameIndex,
-          peopleCount,
-          motionScore,
-        };
-        frameAlerts.push(vAlert);
-        allAlerts.push(vAlert);
+      // Spatial Proximity & Interaction Clustering
+      let hasProximityOverlap = false;
+      const interactingTrackIds = new Set<number>();
+      if (matchedTracks.length >= 2) {
+        for (let a = 0; a < matchedTracks.length; a++) {
+          for (let b = a + 1; b < matchedTracks.length; b++) {
+            const tA = matchedTracks[a];
+            const tB = matchedTracks[b];
+            const dist = Math.hypot(tA.centroid[0] - tB.centroid[0], tA.centroid[1] - tB.centroid[1]);
+            const ix1 = Math.max(tA.bbox[0], tB.bbox[0]);
+            const iy1 = Math.max(tA.bbox[1], tB.bbox[1]);
+            const ix2 = Math.min(tA.bbox[2], tB.bbox[2]);
+            const iy2 = Math.min(tA.bbox[3], tB.bbox[3]);
+            const inter = Math.max(0, ix2 - ix1) * Math.max(0, iy2 - iy1);
+            const areaA = (tA.bbox[2] - tA.bbox[0]) * (tA.bbox[3] - tA.bbox[1]);
+            const areaB = (tB.bbox[2] - tB.bbox[0]) * (tB.bbox[3] - tB.bbox[1]);
+            const iou = inter / (areaA + areaB - inter + 1e-6);
+
+            if (dist < 220 || iou > 0.05) {
+              hasProximityOverlap = true;
+              interactingTrackIds.add(tA.track_id);
+              interactingTrackIds.add(tB.track_id);
+            }
+          }
+        }
+      }
+
+      // Evidence-Based Temporal Violence Event State Machine
+      if (targetTime < 2.0) {
+        // At timestamp 00:00.0 up to 2 seconds, status is strictly ANALYZING
+        violenceState = 'ANALYZING';
+      } else if (!hasProximityOverlap || matchedTracks.length < 2) {
+        // Distant persons or solitary individual cannot be in physical violence
+        if (violenceState === 'CONFIRMED') {
+          consecutiveNormalWindows++;
+          if (consecutiveNormalWindows >= 2) {
+            violenceState = 'CLEARED';
+            activeViolenceEventId = null;
+            activeParticipantTrackIds.clear();
+          }
+        } else {
+          violenceState = 'NORMAL';
+          consecutiveViolentWindows = 0;
+        }
+      } else {
+        // Persons in close physical interaction: evaluate temporal model if kinetic motion elevated
+        if (motionScore >= 0.12 && targetTime - lastViolenceEvalTime >= 0.5) {
+          lastViolenceEvalTime = targetTime;
+          try {
+            const segStart = Math.max(0, targetTime - 2.5);
+            const segEnd = targetTime;
+            const vRes = await fetch('http://127.0.0.1:5050/api/violence/predict', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                videoPath,
+                segment: [segStart, segEnd],
+                source_id: filename,
+                tracks: matchedTracks.map(t => ({ track_id: t.track_id, bbox: t.bbox, centroid: t.centroid }))
+              }),
+              signal: AbortSignal.timeout(3000),
+            });
+            if (vRes.ok) {
+              const vData = await vRes.json();
+              lastViolencePrediction = vData?.prediction || null;
+              if (lastViolencePrediction?.is_violence && (lastViolencePrediction.confidence >= 0.50)) {
+                consecutiveViolentWindows++;
+                consecutiveNormalWindows = 0;
+                if (consecutiveViolentWindows >= 2) {
+                  violenceState = 'CONFIRMED';
+                  activeParticipantTrackIds = new Set(interactingTrackIds);
+                  if (!activeViolenceEventId) {
+                    activeViolenceEventId = `alert-violence-${frameIndex}`;
+                    const vAlert = {
+                      id: activeViolenceEventId,
+                      type: 'VIOLENCE_DETECTED' as const,
+                      severity: 'CRITICAL' as const,
+                      message: `CRITICAL ALERT: Physical Altercation Confirmed at ${formatTimestampMinutes(targetTime)} (${(lastViolencePrediction.confidence * 100).toFixed(1)}% conf, Tracks: [${Array.from(activeParticipantTrackIds).join(', ')}])`,
+                      timestamp: targetTime,
+                      frame: frameIndex,
+                      peopleCount,
+                      motionScore,
+                      participantTrackIds: Array.from(activeParticipantTrackIds),
+                      eventId: activeViolenceEventId,
+                    };
+                    frameAlerts.push(vAlert);
+                    allAlerts.push(vAlert);
+                  }
+                } else {
+                  violenceState = 'POSSIBLE';
+                }
+              } else {
+                consecutiveNormalWindows++;
+                if (consecutiveNormalWindows >= 2) {
+                  if (violenceState === 'CONFIRMED') {
+                    violenceState = 'CLEARED';
+                  } else {
+                    violenceState = 'NORMAL';
+                  }
+                  activeViolenceEventId = null;
+                  activeParticipantTrackIds.clear();
+                  consecutiveViolentWindows = 0;
+                }
+              }
+            }
+          } catch {
+            // Python service timeout / offline fallback
+          }
+        }
+      }
+
+      // Tag tracks: RED for confirmed violence participants, BLUE for normal/bystanders
+      for (const track of matchedTracks) {
+        if (violenceState === 'CONFIRMED' && activeParticipantTrackIds.has(track.track_id)) {
+          track.is_violence_participant = true;
+          track.participant_role = 'POTENTIAL VIOLENCE PARTICIPANT';
+          track.violence_association_conf = lastViolencePrediction?.confidence || 0.89;
+        } else {
+          track.is_violence_participant = false;
+          track.participant_role = 'BYSTANDER';
+          track.violence_association_conf = 0.05;
+        }
       }
 
       const frameTelemetry: ServerFrameTelemetry = {
@@ -647,6 +758,10 @@ export async function analyzeVideoServerSide(
         crowd_status: crowdStatus,
         movement_status: movementStatus,
         alerts: frameAlerts,
+        violence_prediction: lastViolencePrediction,
+        violence_status: violenceState,
+        violence_event_id: activeViolenceEventId,
+        violence_participants: Array.from(activeParticipantTrackIds),
       };
 
       allTelemetry.push(frameTelemetry);
@@ -691,7 +806,7 @@ export async function analyzeVideoServerSide(
     peakPeople,
     telemetry: allTelemetry,
     alerts: allAlerts,
-    violence_prediction: clipViolencePrediction,
+    violence_prediction: lastViolencePrediction,
   };
 
   fs.writeFileSync(outputJsonPath, JSON.stringify(result, null, 2), 'utf8');

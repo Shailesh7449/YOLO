@@ -220,6 +220,105 @@ class TestViolenceDetection(unittest.TestCase):
         self.assertIsInstance(tracked, list)
         print("\n[Test] Person detector & ByteTrack regression check passed successfully")
 
+    def test_07_static_frame_motion_gating_suppression(self):
+        """Verify that identical static frames (zero kinetic motion) are suppressed by multimodal gating."""
+        detector = ViolenceDetector(model_variant="r2plus1d_18")
+        test_img_path = "scratch/v1_frame0.jpg"
+        if not os.path.exists(test_img_path):
+            dummy = np.zeros((224, 224, 3), dtype=np.uint8)
+        else:
+            dummy = cv2.resize(cv2.imread(test_img_path), (224, 224))
+
+        static_frames = [dummy] * 32
+        static_times = [i * 0.04 for i in range(32)]
+        pred = detector.predict_clip(static_frames, static_times)
+
+        self.assertEqual(pred.status, "SUCCESS")
+        self.assertFalse(pred.is_violence, "Static frames must be gated to NON_VIOLENCE")
+        self.assertEqual(pred.label, "NON_VIOLENCE")
+        self.assertEqual(pred.motion_diff, 0.0)
+        self.assertEqual(pred.confidence, 0.0)
+        print(f"\n[Test] Static Frame Suppression: Conf={pred.confidence*100:.1f}%, MotionDiff={pred.motion_diff}, State={pred.event_state}")
+
+    def test_08_participant_association_red_blue(self):
+        """Verify that interacting tracks turn RED (participant) and distant bystanders remain BLUE (normal)."""
+        detector = ViolenceDetector(model_variant="r2plus1d_18")
+
+        mock_tracks = [
+            {"track_id": 41, "bbox": [200, 150, 320, 420], "centroid": [260, 285]},
+            {"track_id": 42, "bbox": [250, 160, 370, 430], "centroid": [310, 295]}, # Overlaps with track 41
+            {"track_id": 99, "bbox": [900, 150, 980, 400], "centroid": [940, 275]}  # Bystander 680px away
+        ]
+
+        # 1. When violence is NOT candidate: all tracks are bystanders
+        p_ids_norm, updated_norm = detector.associate_participants(mock_tracks, is_violence_candidate=False)
+        self.assertEqual(len(p_ids_norm), 0)
+        for t in updated_norm:
+            self.assertFalse(t["is_violence_participant"], f"Track {t['track_id']} should not be participant in normal state")
+
+        # 2. When violence IS candidate: interacting tracks (41 & 42) turn red, bystander (99) remains blue
+        p_ids_viol, updated_viol = detector.associate_participants(mock_tracks, is_violence_candidate=True)
+        self.assertIn(41, p_ids_viol)
+        self.assertIn(42, p_ids_viol)
+        self.assertNotIn(99, p_ids_viol)
+
+        track_map = {t["track_id"]: t for t in updated_viol}
+        self.assertTrue(track_map[41]["is_violence_participant"], "Track 41 must be marked participant")
+        self.assertTrue(track_map[42]["is_violence_participant"], "Track 42 must be marked participant")
+        self.assertFalse(track_map[99]["is_violence_participant"], "Track 99 must remain bystander (BLUE)")
+        print(f"\n[Test] Participant Association: Red tracks={p_ids_viol}, Blue bystander track 99 preserved")
+
+    def test_09_v1_scuffle_temporal_discrimination(self):
+        """Verify that V_1.mp4 at 0.0-2.5s is peaceful and at 3.5-6.5s triggers violence."""
+        v1_path = "uploads/transcoded/video_1792958388239_V_1.mp4"
+        if not os.path.exists(v1_path):
+            self.skipTest("V_1 test clip not found")
+
+        detector = ViolenceDetector(model_variant="r2plus1d_18")
+
+        # Extract frames from 0.0 to 2.5s
+        cap = cv2.VideoCapture(v1_path)
+        fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+
+        early_frames = []
+        early_times = []
+        late_frames = []
+        late_times = []
+        f_idx = 0
+        while True:
+            ret, f = cap.read()
+            if not ret or f is None:
+                break
+            t = f_idx / fps
+            if t <= 2.5:
+                early_frames.append(f)
+                early_times.append(t)
+            elif 3.5 <= t <= 6.5:
+                late_frames.append(f)
+                late_times.append(t)
+            f_idx += 1
+        cap.release()
+
+        # Phase 1: 0.0 - 2.5s (Peaceful walking 800px apart)
+        tracks_early = [
+            {"track_id": 41, "bbox": [150, 100, 250, 400], "centroid": [200, 250]},
+            {"track_id": 42, "bbox": [950, 100, 1050, 400], "centroid": [1000, 250]} # 800px apart
+        ]
+        pred_early = detector.predict_clip(early_frames, early_times, tracks=tracks_early)
+        self.assertFalse(pred_early.is_violence, f"Phase 0.0-2.5s must be NON_VIOLENT, got {pred_early.confidence}")
+        self.assertEqual(len(pred_early.participant_track_ids), 0)
+
+        # Phase 2: 3.5 - 6.5s (Scuffle in close proximity)
+        tracks_late = [
+            {"track_id": 41, "bbox": [400, 150, 550, 450], "centroid": [475, 300]},
+            {"track_id": 42, "bbox": [480, 150, 620, 450], "centroid": [550, 300]} # Converged, 75px
+        ]
+        pred_late = detector.predict_clip(late_frames, late_times, tracks=tracks_late)
+        self.assertTrue(pred_late.is_violence, f"Phase 3.5-6.5s must be VIOLENT, got {pred_late.confidence}")
+        self.assertIn(41, pred_late.participant_track_ids)
+        self.assertIn(42, pred_late.participant_track_ids)
+        print(f"\n[Test] V_1 Discrimination: 0-2.5s -> is_violence={pred_early.is_violence} | 3.5-6.5s -> is_violence={pred_late.is_violence} (conf={pred_late.confidence*100:.1f}%)")
+
 
 if __name__ == "__main__":
     unittest.main()
