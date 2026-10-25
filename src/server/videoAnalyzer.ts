@@ -1,10 +1,11 @@
 import path from 'path';
 import fs from 'fs';
-import { execFile, execSync } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import * as ort from 'onnxruntime-web';
 import { ByteTracker } from '../tracking/bytetrack.ts';
 import { RawDetection } from '../tracking/bytetrack.ts';
+import { getFFmpegPath, getFFprobePath, getSafeTempDir } from './ffmpegHelper.ts';
 
 const execFileAsync = promisify(execFile);
 
@@ -33,14 +34,15 @@ export interface ServerFrameTelemetry {
   movement_status: 'NORMAL' | 'ELEVATED' | 'HIGH_SURGE' | 'RAPID_DISPERSAL' | 'STAGNATION';
   alerts: Array<{
     id: string;
-    type: 'CROWD_THRESHOLD_EXCEEDED' | 'HIGH_MOTION_SURGE' | 'RAPID_DISPERSAL' | 'BOTTLENECK_STAGNATION' | 'UNUSUAL_MOVEMENT';
-    severity: 'WARNING' | 'NORMAL';
+    type: 'CROWD_THRESHOLD_EXCEEDED' | 'HIGH_MOTION_SURGE' | 'RAPID_DISPERSAL' | 'BOTTLENECK_STAGNATION' | 'UNUSUAL_MOVEMENT' | 'VIOLENCE_DETECTED';
+    severity: 'CRITICAL' | 'WARNING' | 'NORMAL';
     message: string;
     timestamp: number;
     frame: number;
     peopleCount: number;
     motionScore: number;
   }>;
+  violence_prediction?: any;
 }
 
 export interface VideoAnalysisResult {
@@ -55,6 +57,7 @@ export interface VideoAnalysisResult {
   peakPeople: number;
   telemetry: ServerFrameTelemetry[];
   alerts: any[];
+  violence_prediction?: any;
 }
 
 const analysisProgressMap = new Map<
@@ -135,21 +138,66 @@ export function getAnalysisProgress(filename: string) {
   return null;
 }
 
-let onnxSession: ort.InferenceSession | null = null;
+const sessionCache = new Map<string, ort.InferenceSession>();
 
-async function getInferenceSession(): Promise<ort.InferenceSession> {
-  if (!onnxSession) {
-    const modelPath = path.join(process.cwd(), 'public', 'models', 'yolo26n.onnx');
-    onnxSession = await ort.InferenceSession.create(modelPath);
+async function getInferenceSession(modelVariant: string = 'yolo26n'): Promise<ort.InferenceSession> {
+  const cached = sessionCache.get(modelVariant);
+  if (cached) return cached;
+
+  const modelFile = modelVariant === 'yolo26s' ? 'yolo26s.onnx' : 'yolo26n.onnx';
+  let modelPath = path.join(process.cwd(), 'public', 'models', modelFile);
+  if (!fs.existsSync(modelPath)) {
+    modelPath = path.join(process.cwd(), 'public', 'models', 'yolo26n.onnx');
   }
-  return onnxSession;
+
+  const session = await ort.InferenceSession.create(modelPath);
+  sessionCache.set(modelVariant, session);
+  console.log(`[VideoAnalyzer] Loaded inference model: ${modelPath} (Inputs: ${session.inputNames.join(', ')}, Outputs: ${session.outputNames.join(', ')})`);
+  return session;
+}
+
+function runServerNMS(boxes: RawDetection[], iouThreshold: number = 0.45): RawDetection[] {
+  if (boxes.length <= 1) return boxes;
+  boxes.sort((a, b) => b[4] - a[4]);
+  const selected: RawDetection[] = [];
+  const active = new Array(boxes.length).fill(true);
+
+  for (let i = 0; i < boxes.length; i++) {
+    if (!active[i]) continue;
+    selected.push(boxes[i]);
+    const [ax1, ay1, ax2, ay2] = boxes[i];
+    const areaA = (ax2 - ax1) * (ay2 - ay1);
+
+    for (let j = i + 1; j < boxes.length; j++) {
+      if (!active[j]) continue;
+      const [bx1, by1, bx2, by2] = boxes[j];
+      const interX1 = Math.max(ax1, bx1);
+      const interY1 = Math.max(ay1, by1);
+      const interX2 = Math.min(ax2, bx2);
+      const interY2 = Math.min(ay2, by2);
+      const interW = Math.max(0, interX2 - interX1);
+      const interH = Math.max(0, interY2 - interY1);
+      const interArea = interW * interH;
+
+      if (interArea > 0) {
+        const areaB = (bx2 - bx1) * (by2 - by1);
+        const union = areaA + areaB - interArea;
+        if (union > 0 && interArea / union > iouThreshold) {
+          active[j] = false;
+        }
+      }
+    }
+  }
+  return selected;
 }
 
 export async function analyzeVideoServerSide(
   videoPath: string,
   filename: string,
   targetAiFps: number = 4,
-  jobId?: string
+  jobId?: string,
+  preferredModel: 'yolo26n' | 'yolo26s' | 'auto' = 'auto',
+  crowdThreshold: number = 20
 ): Promise<VideoAnalysisResult> {
   if (jobId) cancelledJobs.delete(jobId);
   cancelledJobs.delete(filename);
@@ -179,11 +227,15 @@ export async function analyzeVideoServerSide(
     }
   }
 
-  // 1. Probe video metadata
-  const probeOutput = execSync(
-    `ffprobe -v quiet -print_format json -show_format -show_streams "${videoPath}"`,
-    { encoding: 'utf8' }
-  );
+  // 1. Probe video metadata using resolved ffprobe
+  const ffprobePath = await getFFprobePath();
+  const { stdout: probeOutput } = await execFileAsync(ffprobePath, [
+    '-v', 'quiet',
+    '-print_format', 'json',
+    '-show_format',
+    '-show_streams',
+    videoPath,
+  ]);
   const probeData = JSON.parse(probeOutput);
   const videoStream = probeData.streams?.find((s: any) => s.codec_type === 'video');
 
@@ -198,7 +250,15 @@ export async function analyzeVideoServerSide(
     }
   }
 
-  const session = await getInferenceSession();
+  // Choose appropriate model: surveillance videos (Footfall, Counter, etc.) use yolo26s
+  const isSurveillanceFeed =
+    preferredModel === 'yolo26s' ||
+    filename.includes('FootfallVideo') ||
+    filename.includes('Counter') ||
+    filename.includes('surveillance');
+
+  const modelKey = isSurveillanceFeed ? 'yolo26s' : 'yolo26n';
+  const session = await getInferenceSession(modelKey);
 
   // 2. Generate timestamps from t = 0 to final second / EOF
   const step = 1.0 / targetAiFps;
@@ -212,11 +272,11 @@ export async function analyzeVideoServerSide(
   }
 
   const totalFrames = timestamps.length;
-  console.log(`[VideoAnalyzer] Analyzing entire video ${filename}: ${totalFrames} frames from 0.0s to ${finalSec.toFixed(3)}s`);
+  console.log(`[VideoAnalyzer] Analyzing entire video ${filename} using ${modelKey}: ${totalFrames} frames from 0.0s to ${finalSec.toFixed(3)}s`);
 
   const initialProgress = {
     status: 'PROCESSING' as const,
-    progressPercent: 0,
+    progressPercent: 5,
     processedTimestamp: 0,
     duration,
     framesAnalyzed: 0,
@@ -231,6 +291,27 @@ export async function analyzeVideoServerSide(
   let peakPeople = 0;
   let lastCrowdAlertTime = -10;
   let lastSurgeAlertTime = -10;
+  let violenceAlertTriggered = false;
+
+  // Clip violence assessment via Python AI engine (R(2+1)D-18 / X3D-M)
+  let clipViolencePrediction: any = null;
+  try {
+    const vRes = await fetch('http://127.0.0.1:5050/api/violence/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoPath, source_id: filename }),
+      signal: AbortSignal.timeout(12000),
+    });
+    if (vRes.ok) {
+      const vData = await vRes.json();
+      clipViolencePrediction = vData?.prediction || null;
+      if (clipViolencePrediction?.is_violence) {
+        console.log(`[VideoAnalyzer] Physical violence confirmed in ${filename}: confidence ${(clipViolencePrediction.confidence * 100).toFixed(1)}%`);
+      }
+    }
+  } catch (err: any) {
+    console.log(`[VideoAnalyzer] Violence assessment skipped: ${err?.message}`);
+  }
 
   // Initialize production ByteTracker (Kalman filtering + two-stage IoU association)
   const tracker = new ByteTracker(0.20, 0.35, 0.30, 30, 1);
@@ -242,9 +323,8 @@ export async function analyzeVideoServerSide(
   const padX = (640 - scaledW) / 2;
   const padY = (640 - scaledH) / 2;
 
-  // Temporary directory for raw PPM frame dump (PPM is uncompressed raw RGB, ultra fast to read)
-  const tempDir = path.join('/tmp', `analysis_${Date.now()}_${path.parse(filename).name}`);
-  fs.mkdirSync(tempDir, { recursive: true });
+  // Cross-platform safe temporary directory for raw PPM frame dump
+  const tempDir = getSafeTempDir(`analysis_${path.parse(filename).name.replace(/[^a-zA-Z0-9_-]/g, '_')}`);
 
   try {
     if (isJobCancelled(jobId, filename)) {
@@ -278,7 +358,8 @@ export async function analyzeVideoServerSide(
 
     // Extract all frames preserving aspect ratio with centered letterbox padding as binary PPM (P6 raw RGB)
     console.log(`[VideoAnalyzer] Extracting letterboxed frames at ${targetAiFps} fps into PPM...`);
-    await execFileAsync('ffmpeg', [
+    const ffmpegPath = await getFFmpegPath();
+    await execFileAsync(ffmpegPath, [
       '-y',
       '-i', videoPath,
       '-vf', `fps=${targetAiFps},scale=640:640:force_original_aspect_ratio=decrease,pad=640:640:(ow-iw)/2:(oh-ih)/2:color=black`,
@@ -351,42 +432,101 @@ export async function analyzeVideoServerSide(
       }
 
       const tensor = new ort.Tensor('float32', float32Data, [1, 3, 640, 640]);
-      const res = await session.run({ pixel_values: tensor });
+      const inputName = session.inputNames[0] || 'pixel_values';
+      const res = await session.run({ [inputName]: tensor });
 
-      const logits = (res.logits || res.pred_logits)?.data as Float32Array;
-      const boxes = (res.pred_boxes || res.boxes)?.data as Float32Array;
+      const rawCandidates: RawDetection[] = [];
 
-      // Extract Person detections (COCO class 0)
-      const rawDetections: RawDetection[] = [];
-      const numQueries = logits.length / 80;
+      // Architecture 1: DETR / RT-DETR (logits [1, 300, 80] & pred_boxes [1, 300, 4])
+      if (res.logits && res.pred_boxes) {
+        const logits = (res.logits || res.pred_logits)?.data as Float32Array;
+        const boxes = (res.pred_boxes || res.boxes)?.data as Float32Array;
+        const numQueries = logits.length / 80;
 
-      for (let q = 0; q < numQueries; q++) {
-        const logit = logits[q * 80 + 0];
-        const conf = 1 / (1 + Math.exp(-logit)); // Sigmoid activation
-        if (conf >= 0.25) {
-          // Normalized coordinates within the 640x640 letterboxed frame
-          const cx_640 = boxes[q * 4] * 640;
-          const cy_640 = boxes[q * 4 + 1] * 640;
-          const bw_640 = boxes[q * 4 + 2] * 640;
-          const bh_640 = boxes[q * 4 + 3] * 640;
+        for (let q = 0; q < numQueries; q++) {
+          const logit = logits[q * 80 + 0];
+          const conf = 1 / (1 + Math.exp(-logit)); // Sigmoid activation
+          if (conf >= 0.25) {
+            const cx_640 = boxes[q * 4] * 640;
+            const cy_640 = boxes[q * 4 + 1] * 640;
+            const bw_640 = boxes[q * 4 + 2] * 640;
+            const bh_640 = boxes[q * 4 + 3] * 640;
 
-          // Inverse transformation: remove letterbox padding and un-scale to source video coordinates
-          const orig_cx = (cx_640 - padX) / scale;
-          const orig_cy = (cy_640 - padY) / scale;
-          const orig_w = bw_640 / scale;
-          const orig_h = bh_640 / scale;
+            const orig_cx = (cx_640 - padX) / scale;
+            const orig_cy = (cy_640 - padY) / scale;
+            const orig_w = bw_640 / scale;
+            const orig_h = bh_640 / scale;
 
-          const x1 = Math.max(0, Math.min(width, Math.round(orig_cx - orig_w / 2)));
-          const y1 = Math.max(0, Math.min(height, Math.round(orig_cy - orig_h / 2)));
-          const x2 = Math.max(0, Math.min(width, Math.round(orig_cx + orig_w / 2)));
-          const y2 = Math.max(0, Math.min(height, Math.round(orig_cy + orig_h / 2)));
+            const x1 = Math.max(0, Math.min(width, Math.round(orig_cx - orig_w / 2)));
+            const y1 = Math.max(0, Math.min(height, Math.round(orig_cy - orig_h / 2)));
+            const x2 = Math.max(0, Math.min(width, Math.round(orig_cx + orig_w / 2)));
+            const y2 = Math.max(0, Math.min(height, Math.round(orig_cy + orig_h / 2)));
 
-          // Discard invalid degenerate boxes
-          if (x2 > x1 + 4 && y2 > y1 + 4) {
-            rawDetections.push([x1, y1, x2, y2, Math.round(conf * 100) / 100, 0]);
+            if (x2 > x1 + 4 && y2 > y1 + 4) {
+              rawCandidates.push([x1, y1, x2, y2, Math.round(conf * 100) / 100, 0]);
+            }
           }
         }
       }
+      // Architecture 2: Standard YOLO [1, 5, 8400] or [1, 84, 8400]
+      else {
+        const outName = session.outputNames[0];
+        const outTensor = res[outName];
+        if (outTensor) {
+          const outData = outTensor.data as Float32Array;
+          const dims = outTensor.dims;
+          let numAttrs = 84;
+          let numBoxes = 8400;
+          let isTransposed = false;
+
+          if (dims[1] <= 85 && dims[2] > dims[1]) {
+            numAttrs = dims[1];
+            numBoxes = dims[2];
+            isTransposed = false;
+          } else if (dims[2] <= 85 && dims[1] > dims[2]) {
+            numBoxes = dims[1];
+            numAttrs = dims[2];
+            isTransposed = true;
+          }
+
+          for (let b = 0; b < numBoxes; b++) {
+            let cx = 0, cy = 0, bw = 0, bh = 0, conf = 0;
+            if (isTransposed) {
+              const base = b * numAttrs;
+              cx = outData[base];
+              cy = outData[base + 1];
+              bw = outData[base + 2];
+              bh = outData[base + 3];
+              conf = outData[base + 4];
+            } else {
+              cx = outData[b];
+              cy = outData[numBoxes + b];
+              bw = outData[numBoxes * 2 + b];
+              bh = outData[numBoxes * 3 + b];
+              conf = outData[numBoxes * 4 + b];
+            }
+
+            if (conf >= 0.25) {
+              const orig_cx = (cx - padX) / scale;
+              const orig_cy = (cy - padY) / scale;
+              const orig_w = bw / scale;
+              const orig_h = bh / scale;
+
+              const x1 = Math.max(0, Math.min(width, Math.round(orig_cx - orig_w / 2)));
+              const y1 = Math.max(0, Math.min(height, Math.round(orig_cy - orig_h / 2)));
+              const x2 = Math.max(0, Math.min(width, Math.round(orig_cx + orig_w / 2)));
+              const y2 = Math.max(0, Math.min(height, Math.round(orig_cy + orig_h / 2)));
+
+              if (x2 > x1 + 4 && y2 > y1 + 4) {
+                rawCandidates.push([x1, y1, x2, y2, Math.round(conf * 100) / 100, 0]);
+              }
+            }
+          }
+        }
+      }
+
+      // Run NMS to clean duplicate overlapping boxes
+      const rawDetections = runServerNMS(rawCandidates, 0.45);
 
       // Update ByteTracker Kalman Filter and IoU association
       const trackedObjects = tracker.update(rawDetections, targetAiFps);
@@ -430,8 +570,8 @@ export async function analyzeVideoServerSide(
         peakPeople = peopleCount;
       }
 
-      // Exact Crowd safety rule: <= 20 NORMAL, > 20 WARNING
-      const crowdStatus = peopleCount > 20 ? 'WARNING' : 'NORMAL';
+      // Exact Crowd safety rule: <= crowdThreshold NORMAL, > crowdThreshold WARNING
+      const crowdStatus = peopleCount > crowdThreshold ? 'WARNING' : 'NORMAL';
 
       // Combine velocity & flow for robust movement status
       const avgTrackSpeed = matchedTracks.length > 0
@@ -479,6 +619,22 @@ export async function analyzeVideoServerSide(
         };
         frameAlerts.push(alert);
         allAlerts.push(alert);
+      }
+
+      if (clipViolencePrediction?.is_violence && !violenceAlertTriggered) {
+        violenceAlertTriggered = true;
+        const vAlert = {
+          id: `alert-violence-${frameIndex}`,
+          type: 'VIOLENCE_DETECTED' as const,
+          severity: 'CRITICAL' as const,
+          message: `CRITICAL ALERT: Physical Altercation/Violence Detected (${(clipViolencePrediction.confidence * 100).toFixed(1)}% conf, ${clipViolencePrediction.model_name})`,
+          timestamp: targetTime,
+          frame: frameIndex,
+          peopleCount,
+          motionScore,
+        };
+        frameAlerts.push(vAlert);
+        allAlerts.push(vAlert);
       }
 
       const frameTelemetry: ServerFrameTelemetry = {
@@ -535,6 +691,7 @@ export async function analyzeVideoServerSide(
     peakPeople,
     telemetry: allTelemetry,
     alerts: allAlerts,
+    violence_prediction: clipViolencePrediction,
   };
 
   fs.writeFileSync(outputJsonPath, JSON.stringify(result, null, 2), 'utf8');

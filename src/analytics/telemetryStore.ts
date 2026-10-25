@@ -7,9 +7,18 @@ export class TelemetryStore {
   private maxProcessedTimestamp: number = 0;
   private isComplete: boolean = false;
   private videoDuration: number = 0;
+  private crowdThreshold: number = 20;
 
   constructor(maxPoints = 1000) {
     this.maxPoints = maxPoints;
+  }
+
+  public setCrowdThreshold(threshold: number) {
+    this.crowdThreshold = Math.max(0, Math.floor(threshold));
+  }
+
+  public getCrowdThreshold(): number {
+    return this.crowdThreshold;
   }
 
   public setVideoDuration(duration: number) {
@@ -136,7 +145,7 @@ export class TelemetryStore {
           telemetry: lastFrame,
           tracks: lastFrame.tracks,
           people_count: lastCount,
-          crowd_status: lastCount > 20 ? 'WARNING' : 'NORMAL',
+          crowd_status: lastCount > this.crowdThreshold ? 'WARNING' : 'NORMAL',
           movement_status: lastFrame.movement_status,
           motion_score: lastFrame.motion_score,
           timeDifference: currentTime - lastFrame.timestamp,
@@ -196,7 +205,7 @@ export class TelemetryStore {
           telemetry: closestFrame,
           tracks: snapTracks,
           people_count: snapCount,
-          crowd_status: snapCount > 20 ? 'WARNING' : 'NORMAL',
+          crowd_status: snapCount > this.crowdThreshold ? 'WARNING' : 'NORMAL',
           movement_status: closestFrame.movement_status,
           motion_score: closestFrame.motion_score,
           timeDifference: minDiff,
@@ -331,7 +340,7 @@ export class TelemetryStore {
       telemetry: closestFrame,
       tracks: interpolatedTracks,
       people_count: activeCount,
-      crowd_status: activeCount > 20 ? 'WARNING' : 'NORMAL',
+      crowd_status: activeCount > this.crowdThreshold ? 'WARNING' : 'NORMAL',
       movement_status: closestFrame.movement_status,
       motion_score: closestFrame.motion_score,
       timeDifference: minDiff,

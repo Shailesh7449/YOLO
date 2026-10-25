@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-11T18:52:36Z",
+  "timestamp": "2026-10-25T11:15:22Z",
   "model": {
     "name": "yolo26n.onnx",
     "path": "D:\\spidy\\YOLO\\public\\models\\yolo26n.onnx",
@@ -26,14 +26,14 @@
   },
   "metrics": {
     "iterations": 30,
-    "mean_latency_ms": 101.31,
-    "std_latency_ms": 14.75,
-    "median_latency_ms": 100.66,
-    "p95_latency_ms": 128.02,
-    "min_latency_ms": 73.13,
-    "max_latency_ms": 134.78,
-    "throughput_fps": 9.87,
-    "peak_memory_mb": 0.11
+    "mean_latency_ms": 76.58,
+    "std_latency_ms": 18.73,
+    "median_latency_ms": 72.95,
+    "p95_latency_ms": 85.7,
+    "min_latency_ms": 65.71,
+    "max_latency_ms": 173.32,
+    "throughput_fps": 13.06,
+    "peak_memory_mb": 0.07
   },
   "sample_detections": [
     {

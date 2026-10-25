@@ -43,10 +43,23 @@ export interface OpticalFlowResult {
   gridVectors: OpticalFlowVector[];
 }
 
+export interface ViolencePrediction {
+  label: 'VIOLENCE' | 'NON_VIOLENCE';
+  is_violence: boolean;
+  confidence: number;
+  start_timestamp: number;
+  end_timestamp: number;
+  source_id: string;
+  model_name: string;
+  model_version?: string;
+  status: 'SUCCESS' | 'ERROR';
+  latency_ms?: number;
+}
+
 export interface VisionSenseAlert {
   id: string;
-  type: 'CROWD_THRESHOLD_EXCEEDED' | 'HIGH_MOTION_SURGE' | 'RAPID_DISPERSAL' | 'BOTTLENECK_STAGNATION' | 'UNUSUAL_MOVEMENT';
-  severity: 'WARNING' | 'NORMAL';
+  type: 'CROWD_THRESHOLD_EXCEEDED' | 'HIGH_MOTION_SURGE' | 'RAPID_DISPERSAL' | 'BOTTLENECK_STAGNATION' | 'UNUSUAL_MOVEMENT' | 'VIOLENCE_DETECTED';
+  severity: 'CRITICAL' | 'WARNING' | 'NORMAL';
   message: string;
   timestamp: number; // Video playback timestamp in seconds
   frame: number;
@@ -65,6 +78,7 @@ export interface FrameTelemetry {
   movement_status: MovementSafetyStatus;
   optical_flow?: OpticalFlowResult;
   alerts: VisionSenseAlert[];
+  violence_prediction?: ViolencePrediction;
 }
 
 export type PlaybackState = 'PLAYING' | 'PAUSED' | 'COMPLETED';
@@ -107,7 +121,7 @@ export interface TelemetryPoint {
   activeAlertsCount: number;
 }
 
-export type ActiveNavTab = 'dashboard' | 'analysis' | 'alerts' | 'analytics' | 'reports' | 'storage' | 'settings';
+export type ActiveNavTab = 'dashboard' | 'live' | 'analysis' | 'alerts' | 'analytics' | 'reports' | 'storage' | 'settings';
 
 export interface CountingLineConfig {
   id: string;

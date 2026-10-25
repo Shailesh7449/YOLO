@@ -84,6 +84,8 @@ def analyze_video_file(
     video_path: str,
     crowd_threshold: int = 20,
     target_ai_fps: float = 8.0,
+    enable_violence: bool = True,
+    violence_detector: Optional[Any] = None,
     on_frame_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     save_telemetry_file: bool = True
 ) -> Dict[str, Any]:
@@ -117,6 +119,17 @@ def analyze_video_file(
     temporal_analysis = TemporalMovementAnalysis(window_size=24)
     safety_engine = SafetyEngine(crowd_threshold=crowd_threshold, persistence_frames=3)
 
+    violence_det = None
+    if enable_violence:
+        try:
+            if violence_detector is not None:
+                violence_det = violence_detector
+            else:
+                from visionsense.violence_detector import ViolenceDetector
+                violence_det = ViolenceDetector()
+        except Exception as e:
+            print(f"[Pipeline] ViolenceDetector initialization skipped: {e}")
+
     telemetry_frames: List[Dict[str, Any]] = []
     frame_idx = 0
     processed_count = 0
@@ -149,6 +162,32 @@ def analyze_video_file(
                 anomaly_type=temporal_res.anomaly_type
             )
 
+            # Ingest frame into video-action violence detector
+            v_pred = None
+            if violence_det is not None:
+                v_pred, v_trigger = violence_det.ingest_stream_frame(
+                    frame,
+                    timestamp=current_timestamp,
+                    source_id=os.path.basename(video_path),
+                    stride_frames=frame_stride
+                )
+                if v_trigger == "VIOLENCE_INCIDENT_STARTED" and v_pred is not None:
+                    minutes = int(current_timestamp // 60)
+                    seconds = int(current_timestamp % 60)
+                    hundredths = int((current_timestamp % 1) * 100)
+                    v_alert = Alert(
+                        id=f"violence-{int(current_timestamp * 1000)}",
+                        timestamp=round(current_timestamp, 3),
+                        time_formatted=f"{minutes:02d}:{seconds:02d}.{hundredths:02d}",
+                        severity="CRITICAL",
+                        title="Physical Violence Detected",
+                        message=f"Physical altercation/violence detected (Confidence: {v_pred.confidence * 100:.1f}%, Model: {v_pred.model_name})",
+                        people_count=people_count,
+                        acknowledged=False
+                    )
+                    new_alerts.append(v_alert)
+                    safety_engine.alerts_history.append(v_alert)
+
             frame_telemetry = TelemetryFrame(
                 frame_index=frame_idx,
                 timestamp=round(current_timestamp, 3),
@@ -160,7 +199,8 @@ def analyze_video_file(
                 temporal_analysis=temporal_res.to_dict(),
                 alerts=[a.to_dict() for a in new_alerts],
                 fps=round(native_fps, 1),
-                is_eof=False
+                is_eof=False,
+                violence_prediction=v_pred.to_dict() if v_pred else None
             ).to_dict()
 
             telemetry_frames.append(frame_telemetry)
@@ -194,6 +234,7 @@ def analyze_video_file(
         "crowd_threshold": crowd_threshold,
         "model_info": detector.get_metadata(),
         "temporal_info": temporal_analysis.get_metadata(),
+        "violence_info": violence_det.get_status() if violence_det else {"ready": False, "status": "disabled"},
         "total_alerts": len(safety_engine.alerts_history),
         "alerts_history": [a.to_dict() for a in safety_engine.alerts_history],
         "telemetry_frames_count": len(telemetry_frames),

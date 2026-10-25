@@ -63,6 +63,24 @@ class TemporalAnalysisResult:
 
 
 @dataclass
+class ViolencePrediction:
+    label: str  # "VIOLENCE" | "NON_VIOLENCE"
+    is_violence: bool
+    confidence: float
+    start_timestamp: float
+    end_timestamp: float
+    source_id: str
+    model_name: str
+    model_version: str = "v1.0.0"
+    status: str = "SUCCESS"
+    error_details: Optional[str] = None
+    latency_ms: float = 0.0
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
 class Alert:
     id: str
     timestamp: float
@@ -90,6 +108,7 @@ class TelemetryFrame:
     alerts: List[Dict[str, Any]]
     fps: float
     is_eof: bool = False
+    violence_prediction: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)

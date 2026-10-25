@@ -5,6 +5,7 @@ import { execFile, execSync } from 'child_process';
 import { promisify } from 'util';
 import * as ort from 'onnxruntime-web';
 import { analyzeVideoServerSide } from './videoAnalyzer';
+import { getFFmpegPath, getFFprobePath } from './ffmpegHelper';
 
 const execFileAsync = promisify(execFile);
 
@@ -533,7 +534,8 @@ export async function analyzeImageFile(
   let width = 1280;
   let height = 720;
   try {
-    const { stdout } = await execFileAsync('ffprobe', [
+    const ffprobePath = await getFFprobePath();
+    const { stdout } = await execFileAsync(ffprobePath, [
       '-v', 'error',
       '-select_streams', 'v:0',
       '-show_entries', 'stream=width,height',
@@ -554,7 +556,14 @@ export async function analyzeImageFile(
   try {
     const pythonScript = path.join(process.cwd(), 'main.py');
     if (fs.existsSync(pythonScript)) {
-      const { stdout } = await execFileAsync('python3', [
+      const venvWin = path.join(process.cwd(), '.venv', 'Scripts', 'python.exe');
+      const venvUnix = path.join(process.cwd(), '.venv', 'bin', 'python');
+      const pythonBin = fs.existsSync(venvWin)
+        ? venvWin
+        : fs.existsSync(venvUnix)
+        ? venvUnix
+        : (process.platform === 'win32' ? 'python' : 'python3');
+      const { stdout } = await execFileAsync(pythonBin, [
         pythonScript,
         '--mode',
         'analyze-image',
@@ -598,7 +607,7 @@ export async function analyzeImageFile(
   }
 
   // 2. Letterbox image to 640x640 PPM raw RGB
-  const tempPpm = path.join('/tmp', `yolo_img_${Date.now()}_${Math.random().toString(36).substring(7)}.ppm`);
+  const tempPpm = path.join(os.tmpdir(), `yolo_img_${Date.now()}_${Math.random().toString(36).substring(7)}.ppm`);
 
   const scale = Math.min(640 / width, 640 / height);
   const scaledW = Math.round(width * scale);
@@ -606,7 +615,8 @@ export async function analyzeImageFile(
   const padX = (640 - scaledW) / 2;
   const padY = (640 - scaledH) / 2;
 
-  await execFileAsync('ffmpeg', [
+  const ffmpegPath = await getFFmpegPath();
+  await execFileAsync(ffmpegPath, [
     '-y',
     '-i', filePath,
     '-vf', `scale=640:640:force_original_aspect_ratio=decrease,pad=640:640:(ow-iw)/2:(oh-ih)/2:color=black`,
@@ -738,7 +748,8 @@ export async function importVideoEvidence(
   }
 
   // Probe metadata
-  const { stdout } = await execFileAsync('ffprobe', [
+  const ffprobePath = await getFFprobePath();
+  const { stdout } = await execFileAsync(ffprobePath, [
     '-v', 'error',
     '-select_streams', 'v:0',
     '-show_entries', 'stream=width,height,r_frame_rate,duration,codec_name',
@@ -779,7 +790,8 @@ export async function importVideoEvidence(
     fs.copyFileSync(sourcePath, targetPath);
   } else {
     console.log(`[StorageBridge] Transcoding non-native evidence video "${path.basename(sourcePath)}" (${codec})...`);
-    await execFileAsync('ffmpeg', [
+    const ffmpegPath = await getFFmpegPath();
+    await execFileAsync(ffmpegPath, [
       '-y',
       '-i', sourcePath,
       '-c:v', 'libx264',

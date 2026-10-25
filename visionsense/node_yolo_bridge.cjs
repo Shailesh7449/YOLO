@@ -4,6 +4,7 @@
  */
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const { execFileSync } = require('child_process');
 
 async function run() {
@@ -45,7 +46,7 @@ async function run() {
     }
   } catch (e) {}
 
-  const tempPpm = path.join('/tmp', `yolo_bridge_${Date.now()}.ppm`);
+  const tempPpm = path.join(os.tmpdir(), `yolo_bridge_${Date.now()}.ppm`);
   const scale = Math.min(640 / width, 640 / height);
   const scaledW = Math.round(width * scale);
   const scaledH = Math.round(height * scale);

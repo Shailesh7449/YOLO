@@ -9,7 +9,7 @@ interface AlertsViewProps {
 
 export const AlertsView: React.FC<AlertsViewProps> = ({ alerts, onSelectAlert }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [severityFilter, setSeverityFilter] = useState<'ALL' | 'WARNING'>('ALL');
+  const [severityFilter, setSeverityFilter] = useState<'ALL' | 'CRITICAL' | 'WARNING'>('ALL');
 
   const filtered = alerts.filter((a) => {
     const matchesSearch = a.message.toLowerCase().includes(searchTerm.toLowerCase()) || a.type.toLowerCase().includes(searchTerm.toLowerCase());
@@ -33,20 +33,20 @@ export const AlertsView: React.FC<AlertsViewProps> = ({ alerts, onSelectAlert })
             SECURITY INCIDENTS & ALERTS LOG
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Real-time automated incident detection triggered by crowd thresholds and movement surges.
+            Real-time automated incident detection triggered by crowd thresholds, physical violence, and movement surges.
           </p>
         </div>
 
         {/* Filter Bar */}
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
               type="text"
               placeholder="Search incidents..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-48"
+              className="bg-slate-900 border border-slate-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500 w-full sm:w-48"
             />
           </div>
           <select
@@ -55,6 +55,7 @@ export const AlertsView: React.FC<AlertsViewProps> = ({ alerts, onSelectAlert })
             className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500"
           >
             <option value="ALL">All Severities</option>
+            <option value="CRITICAL">Critical Violence Only</option>
             <option value="WARNING">Warnings Only</option>
           </select>
         </div>
@@ -78,7 +79,13 @@ export const AlertsView: React.FC<AlertsViewProps> = ({ alerts, onSelectAlert })
               className="p-4 rounded-xl bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 hover:border-cyan-500/40 transition-all flex items-center justify-between gap-4 cursor-pointer group"
             >
               <div className="flex items-center gap-3.5">
-                <div className="p-2 rounded-lg bg-amber-950/80 border border-amber-800/80 text-amber-400 shrink-0">
+                <div
+                  className={`p-2 rounded-lg shrink-0 ${
+                    alert.severity === 'CRITICAL'
+                      ? 'bg-rose-950/90 border border-rose-700 text-rose-400'
+                      : 'bg-amber-950/80 border border-amber-800/80 text-amber-400'
+                  }`}
+                >
                   <AlertTriangle className="w-4 h-4" />
                 </div>
                 <div>
@@ -89,8 +96,14 @@ export const AlertsView: React.FC<AlertsViewProps> = ({ alerts, onSelectAlert })
                     <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-800 font-medium">
                       {alert.type.replace(/_/g, ' ')}
                     </span>
-                    <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800">
-                      WARNING
+                    <span
+                      className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                        alert.severity === 'CRITICAL'
+                          ? 'bg-rose-950 text-rose-300 border-rose-600 font-bold animate-pulse'
+                          : 'bg-amber-950 text-amber-400 border-amber-800'
+                      }`}
+                    >
+                      {alert.severity}
                     </span>
                   </div>
                   <p className="text-sm text-slate-200 font-medium mt-1 group-hover:text-white">

@@ -1,0 +1,111 @@
+{
+  "timestamp": "2026-10-25T19:26:09.042358+00:00",
+  "model_architecture": "3D CNN Spatio-Temporal Action Recognition (R(2+1)D-18 / X3D-M)",
+  "active_weights": "training/checkpoints/violence_r2plus1d_best.pt",
+  "realtime_onnx": "public/models/violence_x3d_realtime.onnx",
+  "device": "cuda",
+  "gpu_device_name": "NVIDIA GeForce GTX 1650",
+  "vram_allocated_mb": 120.49,
+  "ram_allocated_mb": 802.71,
+  "latency_metrics": {
+    "window_16_mean_ms": 410.39,
+    "window_16_p95_ms": 417.46,
+    "window_32_mean_ms": 411.12,
+    "window_32_p95_ms": 422.44,
+    "fps_equivalent": 2.4
+  },
+  "authentic_cctv_evaluation": {
+    "total_clips_evaluated": 7,
+    "confusion_matrix": {
+      "true_positives": 4,
+      "false_positives": 0,
+      "true_negatives": 3,
+      "false_negatives": 0
+    },
+    "accuracy": 1.0,
+    "precision": 1.0,
+    "recall": 1.0,
+    "f1_score": 1.0,
+    "false_positive_rate": 0.0,
+    "detailed_clip_results": [
+      {
+        "clip": "Fight in corridor (Airtlab)",
+        "filename": "airtlab_violent_1.mp4",
+        "total_frames": 145,
+        "ground_truth": "VIOLENT",
+        "prediction": "VIOLENT",
+        "violence_confidence": 0.9138,
+        "outcome": "TP"
+      },
+      {
+        "clip": "Hallway physical fight (Airtlab)",
+        "filename": "airtlab_violent_102.mp4",
+        "total_frames": 106,
+        "ground_truth": "VIOLENT",
+        "prediction": "VIOLENT",
+        "violence_confidence": 0.9192,
+        "outcome": "TP"
+      },
+      {
+        "clip": "RWF-2000 street brawl sample 1",
+        "filename": "fight_sample_1.mp4",
+        "total_frames": 10,
+        "ground_truth": "VIOLENT",
+        "prediction": "VIOLENT",
+        "violence_confidence": 0.6193,
+        "outcome": "TP"
+      },
+      {
+        "clip": "RWF-2000 altercation sample 4",
+        "filename": "fight_sample_4.mp4",
+        "total_frames": 11,
+        "ground_truth": "VIOLENT",
+        "prediction": "VIOLENT",
+        "violence_confidence": 0.6436,
+        "outcome": "TP"
+      },
+      {
+        "clip": "Hallway normal walking (Airtlab)",
+        "filename": "airtlab_nonviolent_1.mp4",
+        "total_frames": 158,
+        "ground_truth": "NON_VIOLENT",
+        "prediction": "NON_VIOLENT",
+        "violence_confidence": 0.3255,
+        "outcome": "TN"
+      },
+      {
+        "clip": "Footfall shopping concourse flow",
+        "filename": "video_1788979083095_FootfallVideo.mp4",
+        "total_frames": 429,
+        "ground_truth": "NON_VIOLENT",
+        "prediction": "NON_VIOLENT",
+        "violence_confidence": 0.2401,
+        "outcome": "TN"
+      },
+      {
+        "clip": "Surveillance outdoor pedestrian crossing",
+        "filename": "video_1789929392184_surveillance_test.mp4",
+        "total_frames": 240,
+        "ground_truth": "NON_VIOLENT",
+        "prediction": "NON_VIOLENT",
+        "violence_confidence": 0.4171,
+        "outcome": "TN"
+      }
+    ]
+  },
+  "rwf2000_reference_benchmark": {
+    "dataset_name": "RWF-2000 (Real-World Fight)",
+    "dataset_citation": "Cheng et al., RWF-2000: An Open Large Scale Video Database for Violence Detection, ICPR 2020",
+    "validation_set_clips": 400,
+    "test_distribution": {
+      "fight_clips": 200,
+      "non_fight_clips": 200
+    },
+    "r2plus1d_validation_accuracy": 0.8825,
+    "x3d_validation_accuracy": 0.8675
+  },
+  "weapon_detection_status": {
+    "status": "STRICTLY_EXCLUDED",
+    "reason": "Out of scope per user safety specification; dedicated exclusively to human physical altercation recognition."
+  }
+}

@@ -27,6 +27,9 @@ import {
   VisionSenseAlert,
 } from '../types';
 import { TelemetryStore } from '../analytics/telemetryStore';
+import { detectorManager } from '../tracking/detectorManager';
+import { ByteTracker, RawDetection } from '../tracking/bytetrack';
+import { notificationService } from '../services/notificationService';
 
 interface SurveillancePlayerProps {
   videoUrl: string | null;
@@ -59,6 +62,8 @@ interface SurveillancePlayerProps {
   }>;
   activeFeedName?: string;
   onSelectFeed?: (feed: { fileName: string; url: string; label: string }) => void;
+  crowdThreshold?: number;
+  onLiveTracksDetected?: (tracks: TrackedObject[], count: number) => void;
 }
 
 export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
@@ -85,6 +90,8 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
   availableFeeds = [],
   activeFeedName,
   onSelectFeed,
+  crowdThreshold = 20,
+  onLiveTracksDetected,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -107,6 +114,11 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const [syncPeopleCount, setSyncPeopleCount] = useState<number>(0);
   const [syncCrowdStatus, setSyncCrowdStatus] = useState<'NORMAL' | 'WARNING'>('NORMAL');
+
+  // Local ByteTracker and tracks for on-the-fly client inference fallback
+  const localTrackerRef = useRef<ByteTracker>(new ByteTracker(0.20, 0.35, 0.30, 30, 1));
+  const [clientDetectedTracks, setClientDetectedTracks] = useState<TrackedObject[]>([]);
+  const isClientInferringRef = useRef<boolean>(false);
 
   // Track ID initial appearance timestamps for kinetic pop animation (scale 0.85 -> 1.05 -> 1.0)
   const trackSeenTimesRef = useRef<Map<number, number>>(new Map());
@@ -174,7 +186,13 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
 
     const handlePlay = () => {
       setIsPlaying(true);
+      setIsVideoLoading(false);
       syncCurrentPosition();
+    };
+
+    const handlePlaying = () => {
+      setIsVideoLoading(false);
+      setIsPlaying(true);
     };
 
     const handlePause = () => {
@@ -211,6 +229,7 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('loadeddata', syncCurrentPosition);
     video.addEventListener('play', handlePlay);
+    video.addEventListener('playing', handlePlaying);
     video.addEventListener('pause', handlePause);
     video.addEventListener('waiting', handleWaiting);
     video.addEventListener('canplay', handleCanPlay);
@@ -223,12 +242,65 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
       video.removeEventListener('loadedmetadata', handleLoadedMetadata);
       video.removeEventListener('loadeddata', syncCurrentPosition);
       video.removeEventListener('play', handlePlay);
+      video.removeEventListener('playing', handlePlaying);
       video.removeEventListener('pause', handlePause);
       video.removeEventListener('waiting', handleWaiting);
       video.removeEventListener('canplay', handleCanPlay);
       video.removeEventListener('error', handleError);
     };
   }, [videoRef, isScrubbing, onTimeUpdate]);
+
+  // Real-time client inference fallback when playing and server telemetry is not yet loaded/synced
+  useEffect(() => {
+    if (!hasVideo || !isPlaying) return;
+    let isCancelled = false;
+
+    const interval = setInterval(async () => {
+      const video = videoRef.current;
+      if (!video || video.paused || video.ended || isClientInferringRef.current) return;
+      if (!video.videoWidth || !video.videoHeight) return;
+
+      const curTime = video.currentTime;
+      const sync = telemetryStore.getSynchronizedTelemetry(curTime, 0.4);
+
+      // If server telemetry has finished or has synchronized frame at this timestamp, no client inference needed
+      if (sync.status === 'SYNCHRONIZED' && sync.tracks.length > 0) {
+        return;
+      }
+
+      isClientInferringRef.current = true;
+      try {
+        const detections = await detectorManager.detect(video, video.videoWidth, video.videoHeight);
+        if (isCancelled) return;
+
+        const rawDets: RawDetection[] = detections.map((d) => [
+          d.bbox[0],
+          d.bbox[1],
+          d.bbox[2],
+          d.bbox[3],
+          d.confidence,
+          d.class_id,
+        ]);
+
+        const tracks = localTrackerRef.current.update(rawDets, 15);
+        if (!isCancelled) {
+          setClientDetectedTracks(tracks);
+          if (onLiveTracksDetected) {
+            onLiveTracksDetected(tracks, tracks.length);
+          }
+        }
+      } catch (err) {
+        // Fallback gracefully
+      } finally {
+        isClientInferringRef.current = false;
+      }
+    }, 220); // ~4.5 FPS client-side inference
+
+    return () => {
+      isCancelled = true;
+      clearInterval(interval);
+    };
+  }, [hasVideo, isPlaying, telemetryStore, onLiveTracksDetected, videoRef]);
 
   const togglePlay = () => {
     const video = videoRef.current;
@@ -359,14 +431,10 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
           // Handle synchronization state
           if (syncResult.status === 'BEHIND_PLAYBACK') {
             setSyncWarning(syncResult.message || 'AI ANALYSIS BEHIND PLAYBACK');
-            setSyncPeopleCount(0);
           } else if (syncResult.status === 'NOT_YET_AVAILABLE') {
             setSyncWarning(syncResult.message || 'AI ANALYSIS NOT YET AVAILABLE FOR THIS TIMESTAMP');
-            setSyncPeopleCount(0);
           } else {
             setSyncWarning(null);
-            setSyncPeopleCount(syncResult.people_count);
-            setSyncCrowdStatus(syncResult.crowd_status);
           }
 
           // 1. Draw Optical Flow Vectors if synchronized
@@ -392,13 +460,33 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
             ctx.restore();
           }
 
-          // 2. Draw Synchronized ByteTrack Tracks (Only if synchronized, NEVER stale)
+          // 2. Draw Synchronized ByteTrack Tracks (Server Telemetry OR Real-time Client Fallback)
           const tracksToRender =
-            syncResult.status === 'SYNCHRONIZED'
+            syncResult.status === 'SYNCHRONIZED' && syncResult.tracks.length > 0
               ? syncResult.tracks
-              : syncResult.status === 'NO_DATA'
-              ? fallbackTracks
-              : [];
+              : clientDetectedTracks.length > 0
+              ? clientDetectedTracks
+              : syncResult.status === 'SYNCHRONIZED'
+              ? syncResult.tracks
+              : fallbackTracks;
+
+          const effectiveCount =
+            syncResult.status === 'SYNCHRONIZED'
+              ? syncResult.people_count
+              : tracksToRender.length;
+
+          setSyncPeopleCount(effectiveCount);
+          const limit = crowdThreshold || 20;
+          setSyncCrowdStatus(effectiveCount > limit ? 'WARNING' : 'NORMAL');
+
+          // Evaluate exact crowd threshold rule and trigger deduplicated security events
+          notificationService.evaluateCrowdThreshold(
+            activeFeedName || 'cctv_feed',
+            activeFeedName ? `Camera Feed (${activeFeedName.slice(0, 24)})` : 'Surveillance Feed',
+            effectiveCount,
+            limit,
+            currentVideoTime
+          );
 
           const now = performance.now();
 
@@ -1020,8 +1108,8 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
               <StepForward className="w-4 h-4" />
             </button>
 
-            {/* Volume Control */}
-            <div className="flex items-center gap-1.5 ml-1 bg-[#0b101d] p-1.5 rounded-xl border border-slate-800 comic-panel">
+            {/* Volume Control (Desktop / Tablet) */}
+            <div className="hidden sm:flex items-center gap-1.5 ml-1 bg-[#0b101d] p-1.5 rounded-xl border border-slate-800 comic-panel">
               <button
                 onClick={toggleMute}
                 className="text-slate-400 hover:text-cyan-400 transition-colors cursor-pointer"
@@ -1041,8 +1129,8 @@ export const SurveillancePlayer: React.FC<SurveillancePlayerProps> = ({
               />
             </div>
 
-            {/* Playback Speed Selector */}
-            <div className="flex items-center gap-1 ml-1 bg-[#0b101d] p-1 rounded-xl border border-slate-800 comic-panel">
+            {/* Playback Speed Selector (Desktop / Tablet) */}
+            <div className="hidden sm:flex items-center gap-1 ml-1 bg-[#0b101d] p-1 rounded-xl border border-slate-800 comic-panel">
               {[0.5, 1.0, 1.5, 2.0].map((rate) => (
                 <button
                   key={rate}
