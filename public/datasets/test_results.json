@@ -1,0 +1,38 @@
+{
+  "v01": {
+    "videoId": "v01",
+    "filename": "v01_airtlab_corridor_fight.mp4",
+    "expectedLabel": "VIOLENCE",
+    "predictedLabel": "NON-VIOLENCE",
+    "classification": "FALSE_NEGATIVE",
+    "confidence": 0.7,
+    "testedAt": "2026-10-25T22:03:02.568Z",
+    "status": "COMPLETED",
+    "durationSec": 4.83,
+    "framesAnalyzed": 19,
+    "processingTimeMs": 8409,
+    "processingFps": 2.3,
+    "peakPeople": 3,
+    "violenceEventStart": null,
+    "violenceEventEnd": null,
+    "participantIds": []
+  },
+  "n01": {
+    "videoId": "n01",
+    "filename": "n01_airtlab_corridor_walk.mp4",
+    "expectedLabel": "NON-VIOLENCE",
+    "predictedLabel": "NON-VIOLENCE",
+    "classification": "TRUE_NEGATIVE",
+    "confidence": 0.7,
+    "testedAt": "2026-10-25T22:03:55.275Z",
+    "status": "COMPLETED",
+    "durationSec": 5.27,
+    "framesAnalyzed": 21,
+    "processingTimeMs": 7591,
+    "processingFps": 2.8,
+    "peakPeople": 3,
+    "violenceEventStart": null,
+    "violenceEventEnd": null,
+    "participantIds": []
+  }
+}

@@ -9,6 +9,7 @@ import { createServer as createViteServer } from 'vite';
 
 const execFileAsync = promisify(execFile);
 import { analyzeVideoServerSide, getAnalysisProgress, cancelAnalysis } from './src/server/videoAnalyzer.ts';
+import { createTestLibraryRouter } from './src/server/testLibrary.ts';
 import {
   getConnectedStorageDrives,
   browseDirectory,
@@ -860,6 +861,17 @@ app.get('/api/media/:filename', (req, res) => {
     } catch {}
   }
 
+  // Fallback: check built-in validation library datasets
+  if (!fs.existsSync(filePath)) {
+    const vPath = path.join(process.cwd(), 'public', 'datasets', 'violence', reqName);
+    const nPath = path.join(process.cwd(), 'public', 'datasets', 'normal', reqName);
+    if (fs.existsSync(vPath)) {
+      filePath = vPath;
+    } else if (fs.existsSync(nPath)) {
+      filePath = nPath;
+    }
+  }
+
   if (!fs.existsSync(filePath)) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     return res.status(404).send('Media file not found');
@@ -1223,7 +1235,14 @@ app.get('/api/video/telemetry/:filename', (req, res) => {
   }
 
   // If video exists on server but has no telemetry, automatically launch background analysis!
-  const videoPath = path.join(TRANSCODED_DIR, filename);
+  let videoPath = path.join(TRANSCODED_DIR, filename);
+  if (!fs.existsSync(videoPath)) {
+    const vPath = path.join(process.cwd(), 'public', 'datasets', 'violence', filename);
+    const nPath = path.join(process.cwd(), 'public', 'datasets', 'normal', filename);
+    if (fs.existsSync(vPath)) videoPath = vPath;
+    else if (fs.existsSync(nPath)) videoPath = nPath;
+  }
+
   if (fs.existsSync(videoPath)) {
     console.log(`[Server] Telemetry requested for "${filename}" not yet generated. Auto-launching background analysis...`);
     analyzeVideoServerSide(videoPath, filename, 4).catch((err) => {
@@ -1291,7 +1310,13 @@ app.get('/api/video/progress/:filename', (req, res) => {
  */
 app.post('/api/video/analyze/:filename', async (req, res) => {
   const filename = req.params.filename;
-  const videoPath = path.join(TRANSCODED_DIR, filename);
+  let videoPath = path.join(TRANSCODED_DIR, filename);
+  if (!fs.existsSync(videoPath)) {
+    const vPath = path.join(process.cwd(), 'public', 'datasets', 'violence', filename);
+    const nPath = path.join(process.cwd(), 'public', 'datasets', 'normal', filename);
+    if (fs.existsSync(vPath)) videoPath = vPath;
+    else if (fs.existsSync(nPath)) videoPath = nPath;
+  }
 
   if (!fs.existsSync(videoPath)) {
     return res.status(404).json({ error: 'Video file not found' });
@@ -1307,6 +1332,11 @@ app.post('/api/video/analyze/:filename', async (req, res) => {
 
   return res.json({ status: 'PROCESSING', message: 'Full video analysis started', model, crowdThreshold: threshold });
 });
+
+/**
+ * Built-In Violence Validation Library API
+ */
+app.use('/api/test-library', createTestLibraryRouter());
 
 async function bootstrapSampleSurveillanceFeeds() {
   const feeds = [

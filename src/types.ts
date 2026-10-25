@@ -218,3 +218,88 @@ export const COCO_CLASSES: Record<number, string> = {
 export const DEFAULT_COLORS: Record<number, string> = {
   0: '#06b6d4', // Person -> Cyan / Emerald
 };
+
+export type ClassificationOutcome =
+  | 'TRUE_POSITIVE'
+  | 'TRUE_NEGATIVE'
+  | 'FALSE_POSITIVE'
+  | 'FALSE_NEGATIVE'
+  | 'PENDING'
+  | 'ERROR';
+
+export interface VideoTestResult {
+  videoId: string;
+  filename: string;
+  expectedLabel: 'VIOLENCE' | 'NON-VIOLENCE';
+  predictedLabel: 'VIOLENCE' | 'NON-VIOLENCE' | 'UNKNOWN';
+  classification: ClassificationOutcome;
+  confidence: number;
+  testedAt: string;
+  status: 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'RUNNING' | 'PENDING';
+  durationSec: number;
+  framesAnalyzed: number;
+  processingTimeMs: number;
+  processingFps: number;
+  peakPeople: number;
+  violenceEventStart: number | null;
+  violenceEventEnd: number | null;
+  participantIds: number[];
+  errorMessage?: string;
+}
+
+export interface ManifestVideoEntry {
+  id: string;
+  title: string;
+  filename: string;
+  category: 'violence' | 'normal';
+  expected_label: 'VIOLENCE' | 'NON-VIOLENCE';
+  source_dataset: string;
+  source_url: string;
+  license: string;
+  inclusion_notes: string;
+  duration: number;
+  fps: number;
+  resolution: string;
+  width: number;
+  height: number;
+  file_size: number;
+  file_size_formatted: string;
+  video_url: string;
+  thumbnail_url: string;
+  relative_path: string;
+  testResult?: VideoTestResult | null;
+}
+
+export interface ValidationMetrics {
+  totalVideos: number;
+  testedCount: number;
+  pendingCount: number;
+  failedCount: number;
+  truePositives: number;
+  trueNegatives: number;
+  falsePositives: number;
+  falseNegatives: number;
+  accuracy: number | null;
+  precision: number | null;
+  recall: number | null;
+  f1Score: number | null;
+  falsePositiveRate: number | null;
+  falseNegativeRate: number | null;
+  avgProcessingTimeSec: number;
+  avgThroughputFps: number;
+  disclaimer: string;
+}
+
+export interface BatchTestStatus {
+  isRunning: boolean;
+  totalVideos: number;
+  completedCount: number;
+  currentIndex: number;
+  currentVideoId: string | null;
+  currentVideoTitle: string | null;
+  percent: number;
+  startedAt: string | null;
+  elapsedSec: number;
+  metrics: ValidationMetrics;
+}
+
