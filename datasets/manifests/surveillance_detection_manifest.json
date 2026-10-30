@@ -1,0 +1,44 @@
+{
+  "dataset_name": "VisionSense-Surveillance-Pedestrian",
+  "version": "1.0.0",
+  "splits": {
+    "train": {
+      "scenes": 15,
+      "images": 60,
+      "annotations": 924
+    },
+    "val": {
+      "scenes": 5,
+      "images": 20,
+      "annotations": 316
+    }
+  },
+  "class_mapping": {
+    "0": "person"
+  },
+  "random_seed": 42,
+  "scene_assignments": {
+    "cam_20": "train",
+    "cam_06": "train",
+    "cam_15": "train",
+    "cam_05": "train",
+    "cam_10": "train",
+    "cam_14": "train",
+    "cam_16": "train",
+    "cam_19": "train",
+    "cam_07": "train",
+    "cam_13": "train",
+    "cam_18": "train",
+    "cam_11": "train",
+    "cam_02": "train",
+    "cam_12": "train",
+    "cam_03": "train",
+    "cam_17": "val",
+    "cam_08": "val",
+    "cam_09": "val",
+    "cam_01": "val",
+    "cam_04": "val"
+  },
+  "yaml_config": "D:\\spidy\\YOLO\\datasets\\detection\\surveillance_person\\data.yaml",
+  "manifest_hash": "ab17209ab1621a89fcfd15ec347eda814d849e414a89098de4186f656a1b7bfe"
+}

@@ -81,7 +81,11 @@ VisionSense runs a complete, real Python computer vision and evidence pipeline:
 
 ### 2. Installation
 ```bash
+# Production inference dependencies (PyPI compatible)
 pip install -r requirements.txt
+
+# Local GPU training dependencies (CUDA 12.4 PyTorch)
+pip install -r requirements-training.txt
 ```
 
 ### 3. Run Python Microservice

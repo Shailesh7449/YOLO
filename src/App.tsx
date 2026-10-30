@@ -27,6 +27,8 @@ import { AnalyticsView } from './components/AnalyticsView';
 import { ReportsView } from './components/ReportsView';
 import { SettingsView } from './components/SettingsView';
 import { StorageEvidenceView } from './components/StorageEvidenceView';
+import { LiveCameraView } from './components/LiveCameraView';
+import { notificationService } from './services/notificationService';
 
 export const App: React.FC = () => {
   // Navigation State
@@ -57,11 +59,39 @@ export const App: React.FC = () => {
   });
 
   const handleCrowdThresholdChange = (val: number) => {
-    setCrowdThreshold(val);
+    const valid = Math.max(0, Math.floor(val));
+    setCrowdThreshold(valid);
+    telemetryStoreRef.current.setCrowdThreshold(valid);
     try {
-      localStorage.setItem('visionsense_crowd_threshold', String(val));
+      localStorage.setItem('visionsense_crowd_threshold', String(valid));
     } catch {}
   };
+
+  useEffect(() => {
+    telemetryStoreRef.current.setCrowdThreshold(crowdThreshold);
+  }, [crowdThreshold]);
+
+  // Subscribe to Security Notification Service
+  useEffect(() => {
+    const unsubscribe = notificationService.subscribe((event) => {
+      const alertItem: VisionSenseAlert = {
+        id: event.id,
+        type: event.type as any,
+        severity: event.severity as any,
+        message: event.message,
+        timestamp: event.timestamp,
+        frame: Math.round(event.timestamp * 30),
+        peopleCount: event.detectedCount,
+        motionScore: 0.5,
+      };
+      setActiveAlertBanner(alertItem);
+      setRecentAlerts((prev) => {
+        const exists = prev.some((a) => a.id === event.id);
+        return exists ? prev : [alertItem, ...prev];
+      });
+    });
+    return unsubscribe;
+  }, []);
 
   // AI Pipeline Core Engines
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -469,7 +499,7 @@ export const App: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div className="min-h-screen bg-[#070b14] text-slate-100 flex flex-col selection:bg-cyan-500/30 selection:text-cyan-200 w-full max-w-full overflow-x-hidden">
       {/* Top SOC Navigation Header */}
       <NavigationHeader
         activeTab={activeTab}
@@ -485,11 +515,11 @@ export const App: React.FC = () => {
       {/* Main View Area */}
       <main className="flex-1 flex flex-col">
         {activeTab === 'dashboard' && (
-          <div className="flex-1 p-3 lg:p-5 max-w-[1700px] w-full mx-auto flex flex-col gap-4">
+          <div className="flex-1 p-2 sm:p-4 lg:p-5 max-w-[1700px] w-full mx-auto flex flex-col gap-4 min-w-0">
             {/* Primary Monitoring Grid: Video + Events (Left ~68%) | Live AI Command HUD (Right ~32%) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start w-full min-w-0">
               {/* Left Column: Hero Surveillance Video + Security Event Timeline */}
-              <div className="lg:col-span-8 flex flex-col gap-4">
+              <div className="w-full min-w-0 lg:col-span-8 flex flex-col gap-4">
                 <SurveillancePlayer
                   videoUrl={videoUrl}
                   videoMetadata={videoMetadata}
@@ -514,6 +544,13 @@ export const App: React.FC = () => {
                   availableFeeds={availableFeeds}
                   activeFeedName={videoFilename || undefined}
                   onSelectFeed={handleSelectFeed}
+                  crowdThreshold={crowdThreshold}
+                  onLiveTracksDetected={(tracks, count) => {
+                    setPeopleCount(count);
+                    setPeakPeopleCount((prev) => Math.max(prev || 0, count));
+                    setActiveTracks(tracks);
+                    setCrowdStatus(count > crowdThreshold ? 'WARNING' : 'NORMAL');
+                  }}
                 />
 
                 {/* Event Timeline positioned directly beneath the CCTV video display */}
@@ -525,7 +562,7 @@ export const App: React.FC = () => {
               </div>
 
               {/* Right Column: Live AI Analysis Command Panel */}
-              <div className="lg:col-span-4 sticky top-20">
+              <div className="w-full min-w-0 lg:col-span-4 lg:sticky lg:top-20">
                 <LiveAnalysisPanel
                   hasVideo={hasVideo}
                   peopleCount={peopleCount}
@@ -543,9 +580,23 @@ export const App: React.FC = () => {
                   visualConfig={visualConfig}
                   onVisualConfigChange={setVisualConfig}
                   onAlertClick={handleSelectEventTime}
+                  crowdThreshold={crowdThreshold}
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'live' && (
+          <div className="flex-1 p-3 lg:p-5 max-w-[1700px] w-full mx-auto">
+            <LiveCameraView
+              crowdThreshold={crowdThreshold}
+              activeModelName={activeModelName}
+              onAlertTriggered={(newAlert) => {
+                setActiveAlertBanner(newAlert);
+                setRecentAlerts((prev) => [newAlert, ...prev]);
+              }}
+            />
           </div>
         )}
 

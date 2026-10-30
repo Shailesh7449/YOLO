@@ -1,0 +1,10 @@
+test_id,test_case_name,ground_truth,motion_diff,spatial_proximity,baseline_r2plus1d_conf,baseline_outcome,finetuned_r2plus1d_conf,finetuned_outcome,multimodal_gated_conf,multimodal_gated_prediction,multimodal_outcome
+TC-01,airtlab_violent_1 (Corridor Fight),VIOLENT,7.17,OVERLAPPING,0.9138,TP,0.8986,TP,0.8986,VIOLENT,TP
+TC-02,airtlab_violent_102 (Hallway Scuffle),VIOLENT,4.56,OVERLAPPING,0.9192,TP,0.8932,TP,0.8932,VIOLENT,TP
+TC-03,V_1 (Fight Phase 3.5-6.5s),VIOLENT,4.45,OVERLAPPING,0.6639,TP,0.6879,TP,0.6879,VIOLENT,TP
+TC-04,V_1 (Standing Phase 0.0-2.5s),NON_VIOLENT,2.58,DISTANT_800PX,0.8686,FP,0.8275,FP,0.5332,NON_VIOLENT,TN
+TC-05,airtlab_nonviolent_1 (Hallway Walk),NON_VIOLENT,7.41,SOLO,0.3255,TN,0.3574,TN,0.3574,NON_VIOLENT,TN
+TC-06,airtlab_nonviolent_2 (Walk with Bag),NON_VIOLENT,9.66,SOLO,0.8152,FP,0.7705,FP,0.7705,NON_VIOLENT,TN
+TC-07,FootfallVideo (Mall Concourse),NON_VIOLENT,2.33,TRANSIT_FLOW,0.2401,TN,0.3844,TN,0.2237,NON_VIOLENT,TN
+TC-08,surveillance_test (Outdoor Crossing),NON_VIOLENT,1.33,PARALLEL_WALK,0.4171,TN,0.5157,FP,0.1721,NON_VIOLENT,TN
+TC-09,Static Frame (Zero Motion Control),NON_VIOLENT,0.0,DISTANT_800PX,0.9266,FP,0.9098,FP,0.0,NON_VIOLENT,TN

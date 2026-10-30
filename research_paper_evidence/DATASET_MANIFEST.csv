@@ -1,0 +1,18 @@
+video_id,filename,label,source_dataset,split,duration_sec,fps,resolution,annotation_description,exclusion_or_inclusion_reason
+DS-01,airtlab_violent_1.mp4,VIOLENCE,Airtlab CCTV Dataset,TEST,4.83,30.00,1920x1080,Corridor physical scuffle and grappling,Included: Authentic CCTV footage from indoor security camera cam1
+DS-02,airtlab_violent_102.mp4,VIOLENCE,Airtlab CCTV Dataset,TEST,3.53,30.00,1920x1080,Hallway physical altercation with striking,Included: Authentic CCTV footage from indoor security camera cam1
+DS-03,fight_sample_1.mp4,VIOLENCE,RWF-2000 Benchmark,TRAIN,5.00,2.00,464x500,Outdoor street altercation,Included: Canonical RWF-2000 real-world fight training sequence
+DS-04,fight_sample_2.mp4,VIOLENCE,RWF-2000 Benchmark,TRAIN,2.20,5.00,464x500,Sidewalk aggressive grappling,Included: Canonical RWF-2000 real-world fight training sequence
+DS-05,fight_sample_3.mp4,VIOLENCE,RWF-2000 Benchmark,VAL,2.20,5.00,464x500,Pedestrian scuffle and push,Included: RWF-2000 validation split for hyperparameter tuning
+DS-06,fight_sample_4.mp4,VIOLENCE,RWF-2000 Benchmark,VAL,2.20,5.00,464x500,Close-range physical confrontation,Included: RWF-2000 validation split for hyperparameter tuning
+DS-07,airtlab_nonviolent_1.mp4,NON_VIOLENCE,Airtlab CCTV Dataset,TEST,5.27,30.00,1920x1080,Corridor normal walking pedestrians,Included: Authentic CCTV non-violent baseline cam1
+DS-08,airtlab_nonviolent_2.mp4,NON_VIOLENCE,Airtlab CCTV Dataset,TEST,4.60,30.00,1920x1080,Hallway walking with briefcase,Included: Authentic CCTV non-violent baseline cam1
+DS-09,non_fight_sample_1.mp4,NON_VIOLENCE,RWF-2000 Benchmark,TRAIN,1.00,5.00,464x500,Normal walking street gathering,Included: Canonical RWF-2000 non-fight training sequence
+DS-10,non_fight_sample_2.mp4,NON_VIOLENCE,RWF-2000 Benchmark,VAL,2.20,5.00,464x500,Rapid pedestrian transit without contact,Included: RWF-2000 non-fight validation split
+DS-11,video_1788979083095_FootfallVideo.mp4,NON_VIOLENCE,Local CCTV Concourse,TEST,14.30,30.00,1280x720,Shopping mall concourse dense transit,Included: Authentic high-density commercial surveillance test
+DS-12,video_1789929392184_surveillance_test.mp4,NON_VIOLENCE,Local CCTV Outdoor,TEST,8.00,30.00,1280x720,Outdoor street crossing pedestrians,Included: Authentic outdoor street surveillance test
+DS-13,transcoded_1792958700804_crowded.mp4,NON_VIOLENCE,Local CCTV Concourse,VAL,5.00,30.00,1280x720,Stationary and moving crowd gathering,Included: Hard negative crowd gathering validation
+DS-14,transcoded_1789929643377_Counter.mp4,NON_VIOLENCE,Local CCTV Checkout,TRAIN,10.00,30.00,1280x720,Checkout counter standing and talking,Included: Multi-person stationary customer conversation training
+DS-15,video_1792958388239_V_1.mp4,VIOLENCE,Office Altercation Dataset,TEST,6.68,15.42,1920x1080,Peaceful standing (0-2.5s) followed by physical scuffle (3.5-6.5s),Included: Complex dual-phase ground truth for temporal segmentation
+DS-16,video_1792935071959_Makeup.mp4,NON_VIOLENCE,Normal Activity Feed,EXCLUDED,125.93,29.97,1920x1080,Close-up facial cosmetic application,Excluded: Extreme domain shift (non-surveillance selfie format)
+DS-17,video_1792942638639_Skincare.mp4,NON_VIOLENCE,Normal Activity Feed,EXCLUDED,139.91,29.97,1920x1080,Close-up facial skincare application,Excluded: Extreme domain shift (non-surveillance selfie format)

@@ -10,6 +10,9 @@ export interface TrackedObject {
   direction: string; // 'N' | 'NE' | 'E' | 'SE' | 'S' | 'SW' | 'W' | 'NW'
   is_stationary: boolean;
   history?: Array<[number, number]>;
+  is_violence_participant?: boolean;
+  participant_role?: 'PARTICIPANT' | 'BYSTANDER' | 'POTENTIAL VIOLENCE PARTICIPANT' | string;
+  violence_association_conf?: number;
 }
 
 export type RawDetection = [number, number, number, number, number, number]; // [x1, y1, x2, y2, conf, cls]
@@ -21,6 +24,7 @@ export type RawDetection = [number, number, number, number, number, number]; // 
  */
 export type CrowdSafetyStatus = 'NORMAL' | 'WARNING';
 export type MovementSafetyStatus = 'NORMAL' | 'ELEVATED' | 'HIGH_SURGE' | 'RAPID_DISPERSAL' | 'STAGNATION';
+export type ViolenceEventState = 'ANALYZING' | 'NORMAL' | 'POSSIBLE' | 'CONFIRMED' | 'CLEARED';
 
 export interface OpticalFlowVector {
   x: number;
@@ -43,15 +47,32 @@ export interface OpticalFlowResult {
   gridVectors: OpticalFlowVector[];
 }
 
+export interface ViolencePrediction {
+  label: 'VIOLENCE' | 'NON_VIOLENCE';
+  is_violence: boolean;
+  confidence: number;
+  start_timestamp: number;
+  end_timestamp: number;
+  source_id: string;
+  model_name: string;
+  model_version?: string;
+  status: 'SUCCESS' | 'ERROR' | 'ANALYZING';
+  latency_ms?: number;
+  event_state?: ViolenceEventState;
+  participant_track_ids?: number[];
+}
+
 export interface VisionSenseAlert {
   id: string;
-  type: 'CROWD_THRESHOLD_EXCEEDED' | 'HIGH_MOTION_SURGE' | 'RAPID_DISPERSAL' | 'BOTTLENECK_STAGNATION' | 'UNUSUAL_MOVEMENT';
-  severity: 'WARNING' | 'NORMAL';
+  type: 'CROWD_THRESHOLD_EXCEEDED' | 'HIGH_MOTION_SURGE' | 'RAPID_DISPERSAL' | 'BOTTLENECK_STAGNATION' | 'UNUSUAL_MOVEMENT' | 'VIOLENCE_DETECTED';
+  severity: 'CRITICAL' | 'WARNING' | 'NORMAL';
   message: string;
   timestamp: number; // Video playback timestamp in seconds
   frame: number;
   peopleCount: number;
   motionScore: number;
+  participantTrackIds?: number[];
+  eventId?: string;
 }
 
 export interface FrameTelemetry {
@@ -65,6 +86,10 @@ export interface FrameTelemetry {
   movement_status: MovementSafetyStatus;
   optical_flow?: OpticalFlowResult;
   alerts: VisionSenseAlert[];
+  violence_prediction?: ViolencePrediction;
+  violence_status?: ViolenceEventState;
+  violence_event_id?: string | null;
+  violence_participants?: number[];
 }
 
 export type PlaybackState = 'PLAYING' | 'PAUSED' | 'COMPLETED';
@@ -107,7 +132,7 @@ export interface TelemetryPoint {
   activeAlertsCount: number;
 }
 
-export type ActiveNavTab = 'dashboard' | 'analysis' | 'alerts' | 'analytics' | 'reports' | 'storage' | 'settings';
+export type ActiveNavTab = 'dashboard' | 'live' | 'analysis' | 'alerts' | 'analytics' | 'reports' | 'storage' | 'settings';
 
 export interface CountingLineConfig {
   id: string;
@@ -193,3 +218,88 @@ export const COCO_CLASSES: Record<number, string> = {
 export const DEFAULT_COLORS: Record<number, string> = {
   0: '#06b6d4', // Person -> Cyan / Emerald
 };
+
+export type ClassificationOutcome =
+  | 'TRUE_POSITIVE'
+  | 'TRUE_NEGATIVE'
+  | 'FALSE_POSITIVE'
+  | 'FALSE_NEGATIVE'
+  | 'PENDING'
+  | 'ERROR';
+
+export interface VideoTestResult {
+  videoId: string;
+  filename: string;
+  expectedLabel: 'VIOLENCE' | 'NON-VIOLENCE';
+  predictedLabel: 'VIOLENCE' | 'NON-VIOLENCE' | 'UNKNOWN';
+  classification: ClassificationOutcome;
+  confidence: number;
+  testedAt: string;
+  status: 'COMPLETED' | 'FAILED' | 'CANCELLED' | 'RUNNING' | 'PENDING';
+  durationSec: number;
+  framesAnalyzed: number;
+  processingTimeMs: number;
+  processingFps: number;
+  peakPeople: number;
+  violenceEventStart: number | null;
+  violenceEventEnd: number | null;
+  participantIds: number[];
+  errorMessage?: string;
+}
+
+export interface ManifestVideoEntry {
+  id: string;
+  title: string;
+  filename: string;
+  category: 'violence' | 'normal';
+  expected_label: 'VIOLENCE' | 'NON-VIOLENCE';
+  source_dataset: string;
+  source_url: string;
+  license: string;
+  inclusion_notes: string;
+  duration: number;
+  fps: number;
+  resolution: string;
+  width: number;
+  height: number;
+  file_size: number;
+  file_size_formatted: string;
+  video_url: string;
+  thumbnail_url: string;
+  relative_path: string;
+  testResult?: VideoTestResult | null;
+}
+
+export interface ValidationMetrics {
+  totalVideos: number;
+  testedCount: number;
+  pendingCount: number;
+  failedCount: number;
+  truePositives: number;
+  trueNegatives: number;
+  falsePositives: number;
+  falseNegatives: number;
+  accuracy: number | null;
+  precision: number | null;
+  recall: number | null;
+  f1Score: number | null;
+  falsePositiveRate: number | null;
+  falseNegativeRate: number | null;
+  avgProcessingTimeSec: number;
+  avgThroughputFps: number;
+  disclaimer: string;
+}
+
+export interface BatchTestStatus {
+  isRunning: boolean;
+  totalVideos: number;
+  completedCount: number;
+  currentIndex: number;
+  currentVideoId: string | null;
+  currentVideoTitle: string | null;
+  percent: number;
+  startedAt: string | null;
+  elapsedSec: number;
+  metrics: ValidationMetrics;
+}
+

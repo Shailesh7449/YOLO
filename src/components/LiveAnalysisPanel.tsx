@@ -38,6 +38,7 @@ interface LiveAnalysisPanelProps {
   visualConfig: VisualConfig;
   onVisualConfigChange: (config: VisualConfig) => void;
   onAlertClick?: (timestamp: number) => void;
+  crowdThreshold?: number;
 }
 
 export const LiveAnalysisPanel: React.FC<LiveAnalysisPanelProps> = ({
@@ -55,6 +56,7 @@ export const LiveAnalysisPanel: React.FC<LiveAnalysisPanelProps> = ({
   visualConfig,
   onVisualConfigChange,
   onAlertClick,
+  crowdThreshold = 20,
 }) => {
   // Quick number transition only when actual count changes (Section 19 mandate)
   const prevCountRef = useRef<number | null>(peopleCount);
@@ -81,7 +83,7 @@ export const LiveAnalysisPanel: React.FC<LiveAnalysisPanelProps> = ({
       ? String(peopleCount).padStart(2, '0')
       : '00';
 
-  const isWarningCrowd = (peopleCount || 0) > 20 || crowdStatus === 'WARNING';
+  const isWarningCrowd = (peopleCount || 0) > crowdThreshold || crowdStatus === 'WARNING';
 
   return (
     <div className="bg-[#070b14] border-2 border-cyan-500/30 rounded-2xl p-4 flex flex-col gap-3.5 shadow-2xl comic-panel-cyan backdrop-blur-md text-slate-100">
@@ -272,6 +274,10 @@ export const LiveAnalysisPanel: React.FC<LiveAnalysisPanelProps> = ({
             <span className="text-emerald-400 font-semibold ml-1">Active</span>
           </div>
           <div className="flex items-center justify-between col-span-2 border-t border-slate-800/60 pt-1 mt-0.5">
+            <span className="text-slate-400">Action Recognition:</span>
+            <span className="text-cyan-300 font-semibold truncate ml-1">R(2+1)D-18 / X3D-M (RWF-2000)</span>
+          </div>
+          <div className="flex items-center justify-between col-span-2">
             <span className="text-slate-400">Safety Compliance:</span>
             <span className="text-emerald-400 font-semibold">&gt;20 Crowd Threshold Active</span>
           </div>

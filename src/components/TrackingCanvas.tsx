@@ -177,8 +177,14 @@ export const TrackingCanvas: React.FC<TrackingCanvasProps> = ({
         const [x1, y1, x2, y2] = obj.bbox;
         const bw = x2 - x1;
         const bh = y2 - y1;
-        // Person is vibrant emerald green #10b981
-        const color = obj.class_id === 0 ? '#10b981' : DEFAULT_COLORS[obj.class_id] ?? '#94a3b8';
+        // Automatic Red/Blue Person Tracking:
+        // Blue (#00f0ff) for normal tracked persons; Red (#ef4444) for confirmed violence participants
+        const isParticipant = Boolean(obj.is_violence_participant);
+        const color = isParticipant
+          ? '#ef4444'
+          : obj.class_id === 0
+          ? '#00f0ff'
+          : DEFAULT_COLORS[obj.class_id] ?? '#94a3b8';
 
         ctx.save();
         // Box outline
@@ -209,9 +215,11 @@ export const TrackingCanvas: React.FC<TrackingCanvasProps> = ({
         ctx.moveTo(cx, cy - 5); ctx.lineTo(cx, cy + 5);
         ctx.stroke();
 
-        // Exact Label: Person ID: 1 (or Person #1)
+        // Exact Label: Violence Participant or Person ID
         const parts: string[] = [];
-        if (obj.class_id === 0) {
+        if (isParticipant) {
+          parts.push(`VIOLENCE PARTICIPANT #${obj.track_id}`);
+        } else if (obj.class_id === 0) {
           if (visualConfig.show_ids) {
             parts.push(`Person ID: ${obj.track_id}`);
           } else {

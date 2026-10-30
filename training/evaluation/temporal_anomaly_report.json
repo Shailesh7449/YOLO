@@ -1,0 +1,50 @@
+{
+  "timestamp": "2026-10-11T19:18:54Z",
+  "model": "TemporalCrowdAnomalyNet (Bi-GRU + Attention)",
+  "device": "cuda",
+  "gpu_name": "NVIDIA GeForce GTX 1650",
+  "training_time_seconds": 1.56,
+  "epochs": 25,
+  "batch_size": 8,
+  "checkpoint_pt": "D:\\spidy\\YOLO\\training\\checkpoints\\temporal_anomaly_model.pt",
+  "exported_onnx": "D:\\spidy\\YOLO\\training\\checkpoints\\temporal_anomaly_model.onnx",
+  "metrics": {
+    "accuracy": 1.0,
+    "macro_f1": 1.0,
+    "roc_auc": 1.0,
+    "latency_ms": 0.26,
+    "throughput_fps": 3851.45,
+    "confusion_matrix": [
+      [
+        6,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        4,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        1,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        2
+      ]
+    ]
+  },
+  "classes": [
+    "Normal",
+    "Surge",
+    "Dispersal",
+    "Congestion"
+  ]
+}

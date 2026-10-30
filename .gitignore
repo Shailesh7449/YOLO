@@ -25,6 +25,7 @@ weights/
 *.pth
 *.onnx
 !public/models/yolo26n.onnx
+!public/models/violence_x3d_realtime.onnx
 
 # Results (generated output)
 results/tracked_videos/
@@ -58,4 +59,12 @@ logs/
 
 # App Specific
 uploads/
+scratch/
+datasets/violence/**/*.mp4
 public/*.mp4
+runs/
+.pytest_cache/
+datasets/detection/*/images/
+datasets/detection/*/labels/
+datasets/detection/*/*.cache
+datasets/surveillance_anomaly/*/*.npy

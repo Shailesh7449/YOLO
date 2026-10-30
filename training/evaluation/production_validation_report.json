@@ -1,0 +1,36 @@
+{
+  "timestamp": "2026-10-25T11:42:24Z",
+  "validation_dataset": {
+    "images_count": 20,
+    "total_ground_truth_persons": 316,
+    "path": "datasets\\detection\\surveillance_person\\images\\val"
+  },
+  "model": {
+    "name": "YOLO26n ONNX (End-to-End NMS-Free)",
+    "path": "public/models/yolo26n.onnx",
+    "backend": "onnxruntime",
+    "provider": "CPUExecutionProvider",
+    "confidence_threshold": 0.28
+  },
+  "empirical_metrics": {
+    "precision_at_50": 0.0,
+    "recall_at_50": 0.0,
+    "f1_score_at_50": 0.0,
+    "mAP50": 0.0,
+    "mAP50_95": 0.0,
+    "crowd_count_mae": 15.8,
+    "crowd_count_rmse": 17.035,
+    "mean_inference_latency_ms": 126.49,
+    "throughput_fps": 7.91,
+    "meets_target_92_to_95_percent": false
+  },
+  "safety_rule_verification": {
+    "count_20_status": "NORMAL",
+    "count_21_status": "WARNING",
+    "exact_boundary_verified": true
+  },
+  "bytetrack_tracking_stability": {
+    "id_persistence_verified": true,
+    "persistent_id": 1
+  }
+}

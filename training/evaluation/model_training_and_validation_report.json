@@ -1,0 +1,93 @@
+{
+  "timestamp": "2026-10-25T20:35:33Z",
+  "architecture": "R(2+1)D-18 (Spatio-Temporal Video Action Recognition)",
+  "device": "cuda",
+  "gpu_name": "NVIDIA GeForce GTX 1650",
+  "training_epochs": 1,
+  "best_val_f1": 0.0,
+  "training_history": [
+    {
+      "epoch": 1,
+      "train_loss": 0.9029,
+      "val_loss": 0.8891,
+      "val_accuracy": 0.4,
+      "val_f1": 0.0,
+      "val_tp": 0,
+      "val_fp": 1,
+      "val_tn": 2,
+      "val_fn": 2
+    }
+  ],
+  "held_out_test_metrics": {
+    "total_samples": 7,
+    "accuracy": 0.5714,
+    "precision": 0.5,
+    "recall": 1.0,
+    "f1_score": 0.6667,
+    "confusion_matrix": {
+      "tp": 3,
+      "fp": 3,
+      "tn": 1,
+      "fn": 0
+    },
+    "mean_latency_ms": 3216.02
+  },
+  "sample_evaluations": [
+    {
+      "sample": "airtlab_violent_1",
+      "ground_truth": "VIOLENT",
+      "prediction": "VIOLENT",
+      "confidence_violence": 0.8985,
+      "outcome": "TP",
+      "latency_ms": 3417.96
+    },
+    {
+      "sample": "airtlab_violent_102",
+      "ground_truth": "VIOLENT",
+      "prediction": "VIOLENT",
+      "confidence_violence": 0.8933,
+      "outcome": "TP",
+      "latency_ms": 3141.4
+    },
+    {
+      "sample": "V_1_fight_segment",
+      "ground_truth": "VIOLENT",
+      "prediction": "VIOLENT",
+      "confidence_violence": 0.6879,
+      "outcome": "TP",
+      "latency_ms": 3196.64
+    },
+    {
+      "sample": "airtlab_nonviolent_1",
+      "ground_truth": "NON_VIOLENT",
+      "prediction": "NON_VIOLENT",
+      "confidence_violence": 0.3575,
+      "outcome": "TN",
+      "latency_ms": 3152.4
+    },
+    {
+      "sample": "airtlab_nonviolent_2",
+      "ground_truth": "NON_VIOLENT",
+      "prediction": "VIOLENT",
+      "confidence_violence": 0.7706,
+      "outcome": "FP",
+      "latency_ms": 3184.93
+    },
+    {
+      "sample": "surveillance_test_outdoor",
+      "ground_truth": "NON_VIOLENT",
+      "prediction": "VIOLENT",
+      "confidence_violence": 0.5157,
+      "outcome": "FP",
+      "latency_ms": 3147.02
+    },
+    {
+      "sample": "V_1_peaceful_segment",
+      "ground_truth": "NON_VIOLENT",
+      "prediction": "VIOLENT",
+      "confidence_violence": 0.8275,
+      "outcome": "FP",
+      "latency_ms": 3271.82
+    }
+  ]
+}

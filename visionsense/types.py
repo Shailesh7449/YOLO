@@ -31,6 +31,9 @@ class TrackedPerson:
     centroid: List[float]  # [cx, cy]
     velocity: List[float] = field(default_factory=lambda: [0.0, 0.0])
     stationary_frames: int = 0
+    is_violence_participant: bool = False
+    participant_role: str = "BYSTANDER"
+    violence_association_conf: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -56,6 +59,25 @@ class TemporalAnalysisResult:
     anomaly_type: Optional[str]
     confidence: float
     persistence_counter: int
+    model_type: str = "heuristic"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass
+class ViolencePrediction:
+    label: str  # "VIOLENCE" | "NON_VIOLENCE"
+    is_violence: bool
+    confidence: float
+    start_timestamp: float
+    end_timestamp: float
+    source_id: str
+    model_name: str
+    model_version: str = "v1.0.0"
+    status: str = "SUCCESS"
+    error_details: Optional[str] = None
+    latency_ms: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -89,6 +111,7 @@ class TelemetryFrame:
     alerts: List[Dict[str, Any]]
     fps: float
     is_eof: bool = False
+    violence_prediction: Optional[Dict[str, Any]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         data = asdict(self)

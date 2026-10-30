@@ -28,6 +28,7 @@ def analyze_image_file(
 ) -> Dict[str, Any]:
     start_time = time.time()
     detector = YOLOPersonDetector(conf_threshold=conf_threshold)
+    det_meta = detector.get_metadata()
 
     img_w, img_h = 1280, 720
     try:
@@ -70,7 +71,8 @@ def analyze_image_file(
         "crowd_status": crowd_status,
         "crowd_threshold": crowd_threshold,
         "inference_time_ms": inference_ms,
-        "model_used": "Ultralytics YOLO26n (Person Class 0)",
+        "model_used": det_meta["name"],
+        "model_info": det_meta,
         "detections": [d.to_dict() for d in detections],
         "alerts": alerts,
         "analysis_type": "spatial_only",
@@ -82,6 +84,8 @@ def analyze_video_file(
     video_path: str,
     crowd_threshold: int = 20,
     target_ai_fps: float = 8.0,
+    enable_violence: bool = True,
+    violence_detector: Optional[Any] = None,
     on_frame_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     save_telemetry_file: bool = True
 ) -> Dict[str, Any]:
@@ -112,19 +116,35 @@ def analyze_video_file(
     detector = YOLOPersonDetector()
     tracker = ByteTracker(high_thresh=0.45, low_thresh=0.1)
     optical_flow = DenseOpticalFlow(grid_w=48, grid_h=27)
-    temporal_analysis = TemporalMovementAnalysis(window_size=20)
+    temporal_analysis = TemporalMovementAnalysis(window_size=24)
     safety_engine = SafetyEngine(crowd_threshold=crowd_threshold, persistence_frames=3)
+
+    violence_det = None
+    if enable_violence:
+        try:
+            if violence_detector is not None:
+                violence_det = violence_detector
+            else:
+                from visionsense.violence_detector import ViolenceDetector
+                violence_det = ViolenceDetector()
+        except Exception as e:
+            print(f"[Pipeline] ViolenceDetector initialization skipped: {e}")
+
+    if violence_det is not None:
+        violence_det.reset()
 
     telemetry_frames: List[Dict[str, Any]] = []
     frame_idx = 0
     processed_count = 0
     start_wall_time = time.time()
     last_timestamp = 0.0
+    is_true_eof = False
 
     while True:
         ret, frame = cap.read()
         if not ret or frame is None:
             # Reached true End-Of-File (EOF)
+            is_true_eof = True
             break
 
         current_timestamp = frame_idx / native_fps
@@ -145,6 +165,54 @@ def analyze_video_file(
                 anomaly_type=temporal_res.anomaly_type
             )
 
+            # Ingest frame into video-action violence detector
+            v_pred = None
+            if violence_det is not None:
+                track_dicts = [t.to_dict() for t in tracked_persons]
+                v_pred, v_trigger = violence_det.ingest_stream_frame(
+                    frame,
+                    timestamp=current_timestamp,
+                    source_id=os.path.basename(video_path),
+                    stride_frames=frame_stride,
+                    tracks=track_dicts
+                )
+                # Dynamic Red/Blue Participant Assignment:
+                # Active altercation participants marked is_violence_participant = True (RED)
+                # Bystanders / normal pedestrians retain is_violence_participant = False (BLUE)
+                if v_pred and v_pred.participant_track_ids and v_pred.is_violence:
+                    participant_set = set(v_pred.participant_track_ids)
+                    for t in tracked_persons:
+                        if t.track_id in participant_set:
+                            t.is_violence_participant = True
+                            t.participant_role = "POTENTIAL VIOLENCE PARTICIPANT"
+                            t.violence_association_conf = 0.90
+                        else:
+                            t.is_violence_participant = False
+                            t.participant_role = "BYSTANDER"
+                            t.violence_association_conf = 0.10
+                else:
+                    for t in tracked_persons:
+                        t.is_violence_participant = False
+                        t.participant_role = "BYSTANDER"
+                        t.violence_association_conf = 0.0
+
+                if v_trigger == "VIOLENCE_INCIDENT_STARTED" and v_pred is not None:
+                    minutes = int(current_timestamp // 60)
+                    seconds = int(current_timestamp % 60)
+                    hundredths = int((current_timestamp % 1) * 100)
+                    v_alert = Alert(
+                        id=f"violence-{int(current_timestamp * 1000)}",
+                        timestamp=round(current_timestamp, 3),
+                        time_formatted=f"{minutes:02d}:{seconds:02d}.{hundredths:02d}",
+                        severity="CRITICAL",
+                        title="Physical Violence Detected",
+                        message=f"Physical altercation/violence detected (Confidence: {v_pred.confidence * 100:.1f}%, Model: {v_pred.model_name})",
+                        people_count=people_count,
+                        acknowledged=False
+                    )
+                    new_alerts.append(v_alert)
+                    safety_engine.alerts_history.append(v_alert)
+
             frame_telemetry = TelemetryFrame(
                 frame_index=frame_idx,
                 timestamp=round(current_timestamp, 3),
@@ -156,7 +224,8 @@ def analyze_video_file(
                 temporal_analysis=temporal_res.to_dict(),
                 alerts=[a.to_dict() for a in new_alerts],
                 fps=round(native_fps, 1),
-                is_eof=False
+                is_eof=False,
+                violence_prediction=v_pred.to_dict() if v_pred else None
             ).to_dict()
 
             telemetry_frames.append(frame_telemetry)
@@ -170,19 +239,27 @@ def analyze_video_file(
     cap.release()
     total_analysis_time = time.time() - start_wall_time
 
-    completion_percentage = 100.0 if (video_duration == 0 or last_timestamp >= video_duration * 0.95) else round((last_timestamp / video_duration) * 100, 1)
+    if is_true_eof:
+        completion_percentage = 100.0
+        status_text = "PROCESSING COMPLETE"
+    else:
+        completion_percentage = round((last_timestamp / video_duration) * 100, 1) if video_duration > 0 else 0.0
+        status_text = "PROCESSING INCOMPLETE"
 
     result = {
         "success": True,
         "filename": os.path.basename(video_path),
         "video_duration_seconds": round(video_duration, 2),
         "last_processed_timestamp": round(last_timestamp, 2),
-        "completion_percentage": 100.0,
-        "status": "PROCESSING COMPLETE",
+        "completion_percentage": completion_percentage,
+        "status": status_text,
         "total_frames_sampled": processed_count,
         "native_fps": round(native_fps, 2),
         "resolution": {"width": video_width, "height": video_height},
         "crowd_threshold": crowd_threshold,
+        "model_info": detector.get_metadata(),
+        "temporal_info": temporal_analysis.get_metadata(),
+        "violence_info": violence_det.get_status() if violence_det else {"ready": False, "status": "disabled"},
         "total_alerts": len(safety_engine.alerts_history),
         "alerts_history": [a.to_dict() for a in safety_engine.alerts_history],
         "telemetry_frames_count": len(telemetry_frames),
