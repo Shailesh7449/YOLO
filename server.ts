@@ -39,6 +39,18 @@ try {
   console.log('[Server] Note: Nginx config modification skipped:', (nginxErr as any)?.message || nginxErr);
 }
 
+// Global process safety handlers to guard against browser disconnects (ECONNRESET/EPIPE)
+process.on('uncaughtException', (err: any) => {
+  if (err?.code === 'ECONNRESET' || err?.code === 'EPIPE' || err?.code === 'ERR_STREAM_PREMATURE_CLOSE') {
+    return; // Expected during client video seeking or upload cancellation
+  }
+  console.error('[Server] Uncaught exception:', err);
+});
+
+process.on('unhandledRejection', (reason: any) => {
+  console.error('[Server] Unhandled rejection:', reason);
+});
+
 const app = express();
 const PORT = parseInt(process.env.PORT || '3000', 10);
 
@@ -469,6 +481,9 @@ app.post('/api/upload/complete', async (req, res) => {
 
     let stderr = '';
     ffmpeg.stderr.on('data', (d) => { stderr += d.toString(); });
+    ffmpeg.on('error', (err) => {
+      console.warn(`[Transcoder] FFmpeg spawn error:`, err?.message || err);
+    });
 
     ffmpeg.on('close', async (code) => {
       try { fs.unlinkSync(tempMergedPath); } catch {}
@@ -649,6 +664,9 @@ app.post('/api/upload', (req, res, next) => {
 
   let stderr = '';
   ffmpeg.stderr.on('data', (d) => { stderr += d.toString(); });
+  ffmpeg.on('error', (err) => {
+    console.warn(`[Transcoder] FFmpeg spawn error:`, err?.message || err);
+  });
 
   ffmpeg.on('close', async (code) => {
     try { fs.unlinkSync(inputPath); } catch {}
@@ -904,6 +922,8 @@ app.get('/api/media/:filename', (req, res) => {
       'Cache-Control': 'public, max-age=3600',
     };
     res.writeHead(206, head);
+    file.on('error', () => { if (!res.headersSent) try { res.status(500).end(); } catch {} });
+    res.on('close', () => { file.destroy(); });
     file.pipe(res);
   } else {
     const head = {
@@ -917,7 +937,10 @@ app.get('/api/media/:filename', (req, res) => {
       'Cache-Control': 'public, max-age=3600',
     };
     res.writeHead(200, head);
-    fs.createReadStream(filePath).pipe(res);
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', () => { if (!res.headersSent) try { res.status(500).end(); } catch {} });
+    res.on('close', () => { stream.destroy(); });
+    stream.pipe(res);
   }
 });
 
@@ -1140,6 +1163,8 @@ app.get('/api/storage/media', (req, res) => {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=3600',
       });
+      file.on('error', () => { if (!res.headersSent) try { res.status(500).end(); } catch {} });
+      res.on('close', () => { file.destroy(); });
       file.pipe(res);
     } else {
       res.writeHead(200, {
@@ -1148,7 +1173,10 @@ app.get('/api/storage/media', (req, res) => {
         'Accept-Ranges': 'bytes',
         'Cache-Control': 'public, max-age=3600',
       });
-      fs.createReadStream(filePath).pipe(res);
+      const stream = fs.createReadStream(filePath);
+      stream.on('error', () => { if (!res.headersSent) try { res.status(500).end(); } catch {} });
+      res.on('close', () => { stream.destroy(); });
+      stream.pipe(res);
     }
   } else {
     // Images
@@ -1438,8 +1466,23 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`[VisionSense SOC] Server running on http://0.0.0.0:${PORT}`);
+  });
+
+  server.on('error', (err: any) => {
+    if (err.code === 'EADDRINUSE') {
+      const fallbackPort = PORT + 1;
+      console.warn(`[VisionSense SOC] Port ${PORT} is in use, attempting fallback to http://0.0.0.0:${fallbackPort}...`);
+      const fallbackServer = app.listen(fallbackPort, '0.0.0.0', () => {
+        console.log(`[VisionSense SOC] Server running on http://0.0.0.0:${fallbackPort}`);
+      });
+      fallbackServer.on('error', (fbErr: any) => {
+        console.error('[VisionSense SOC] Fallback server listen error:', fbErr);
+      });
+    } else {
+      console.error('[VisionSense SOC] Server listen error:', err);
+    }
   });
 }
 

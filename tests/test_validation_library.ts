@@ -33,9 +33,9 @@ function runAssertions() {
   try {
     const manifest = loadManifest();
     assert(Boolean(manifest), 'Manifest loads successfully from disk');
-    assert(manifest.total_videos === 15, `Manifest contains 15 total videos (found: ${manifest.total_videos})`);
-    assert(manifest.violence_count === 7, `Manifest contains 7 violence videos (found: ${manifest.violence_count})`);
-    assert(manifest.normal_count === 8, `Manifest contains 8 normal videos (found: ${manifest.normal_count})`);
+    assert(manifest.total_videos === 30, `Manifest contains 30 total videos (found: ${manifest.total_videos})`);
+    assert(manifest.violence_count === 15, `Manifest contains 15 violence videos (found: ${manifest.violence_count})`);
+    assert(manifest.normal_count === 15, `Manifest contains 15 normal videos (found: ${manifest.normal_count})`);
 
     let allFilesExist = true;
     let allThumbsExist = true;
@@ -184,7 +184,7 @@ function runAssertions() {
     .then(async (res) => {
       assert(res.ok, 'GET /api/test-library/manifest returns HTTP 200');
       const data = await res.json();
-      assert(data.total_videos === 15, 'API manifest returns 15 registered clips');
+      assert(data.total_videos === 30, 'API manifest returns 30 registered clips');
       assert(Array.isArray(data.videos), 'API returns enriched videos array');
       assert(Boolean(data.metrics), 'API returns live computed validation metrics');
       assert(Boolean(data.batchStatus), 'API returns batch status');

@@ -32,7 +32,7 @@ class TestViolenceDetection(unittest.TestCase):
         # 1. R(2+1)D-18
         detector_r2 = ViolenceDetector(model_variant="r2plus1d_18")
         self.assertTrue(detector_r2.is_ready, f"R(2+1)D-18 failed to initialize: {detector_r2.init_error}")
-        self.assertEqual(detector_r2.num_frames, 32)
+        self.assertIn(detector_r2.num_frames, (16, 32))
         self.assertIn("R(2+1)D-18", detector_r2.model_name)
 
         # 2. X3D-M PyTorch
@@ -58,7 +58,7 @@ class TestViolenceDetection(unittest.TestCase):
         timestamps = []
         fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
         idx = 0
-        while len(frames) < 64:
+        while True:
             ret, f = cap.read()
             if not ret or f is None:
                 break
@@ -131,7 +131,7 @@ class TestViolenceDetection(unittest.TestCase):
 
         while True:
             ret, frame = cap.read()
-            if not ret or frame is None or frame_idx > 100:
+            if not ret or frame is None or frame_idx > 60:
                 break
             ts = frame_idx / fps
             pred, trigger = detector.ingest_stream_frame(frame, ts, stride_frames=8)

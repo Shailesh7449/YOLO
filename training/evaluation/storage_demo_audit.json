@@ -1,0 +1,309 @@
+{
+  "accuracy": 0.9333,
+  "violence_tp": 14,
+  "violence_fn": 1,
+  "normal_tn": 14,
+  "normal_fp": 1,
+  "results": [
+    {
+      "id": "v01",
+      "filename": "v01_airtlab_corridor_fight.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.661,
+      "mot": 10.22,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v02",
+      "filename": "v02_airtlab_hallway_scuffle.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.7487,
+      "mot": 6.94,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v03",
+      "filename": "v03_cctv_office_altercation.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.7721,
+      "mot": 12.51,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v04",
+      "filename": "v04_airtlab_slap_shove.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.6298,
+      "mot": 11.06,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v05",
+      "filename": "v05_airtlab_kick_strike.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.835,
+      "mot": 15.21,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v06",
+      "filename": "v06_airtlab_floor_brawl.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.6226,
+      "mot": 17.25,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v07",
+      "filename": "v07_airtlab_punch_altercation.mp4",
+      "gt": "VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.223,
+      "mot": 8.79,
+      "correct": false,
+      "status": "FAIL"
+    },
+    {
+      "id": "v08",
+      "filename": "v08_airtlab_multi_subject_brawl.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.8387,
+      "mot": 15.33,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v09",
+      "filename": "v09_airtlab_push_wall.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.7519,
+      "mot": 11.14,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v10",
+      "filename": "v10_airtlab_wide_altercation_cam2.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.7137,
+      "mot": 5.23,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v11",
+      "filename": "v11_airtlab_hallway_grapple_cam2.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.6569,
+      "mot": 5.79,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v12",
+      "filename": "v12_airtlab_kick_retaliation.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.7459,
+      "mot": 16.17,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v13",
+      "filename": "v13_airtlab_rapid_ambush.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.6637,
+      "mot": 14.01,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v14",
+      "filename": "v14_airtlab_club_scuffle.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.6903,
+      "mot": 8.53,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "v15",
+      "filename": "v15_public_street_scuffle.mp4",
+      "gt": "VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.7482,
+      "mot": 9.77,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n01",
+      "filename": "n01_airtlab_corridor_walk.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.2238,
+      "mot": 10.33,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n02",
+      "filename": "n02_airtlab_bag_transit.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "VIOLENCE",
+      "conf": 0.7803,
+      "mot": 14.48,
+      "correct": false,
+      "status": "FAIL"
+    },
+    {
+      "id": "n03",
+      "filename": "n03_surveillance_mall_footfall.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.0379,
+      "mot": 3.1,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n04",
+      "filename": "n04_surveillance_street_crossing.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.0368,
+      "mot": 2.04,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n05",
+      "filename": "n05_retail_counter_service.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.0439,
+      "mot": 2.39,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n06",
+      "filename": "n06_plaza_crowd_movement.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.1628,
+      "mot": 11.99,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n07",
+      "filename": "n07_airtlab_hand_gestures.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.1228,
+      "mot": 7.77,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n08",
+      "filename": "n08_airtlab_highfive_greeting.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.3567,
+      "mot": 12.6,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n09",
+      "filename": "n09_airtlab_friendly_hug.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.278,
+      "mot": 7.47,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n10",
+      "filename": "n10_airtlab_jump_hug.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.3677,
+      "mot": 11.87,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n11",
+      "filename": "n11_airtlab_friendly_punch.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.2735,
+      "mot": 12.64,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n12",
+      "filename": "n12_airtlab_hug_cam2.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.1283,
+      "mot": 4.37,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n13",
+      "filename": "n13_airtlab_gestures_cam2.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.2553,
+      "mot": 4.53,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n14",
+      "filename": "n14_cctv_corridor_transit.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.3362,
+      "mot": 47.72,
+      "correct": true,
+      "status": "PASS"
+    },
+    {
+      "id": "n15",
+      "filename": "n15_airtlab_animated_discussion.mp4",
+      "gt": "NON_VIOLENCE",
+      "pred": "NON_VIOLENCE",
+      "conf": 0.1183,
+      "mot": 9.39,
+      "correct": true,
+      "status": "PASS"
+    }
+  ]
+}

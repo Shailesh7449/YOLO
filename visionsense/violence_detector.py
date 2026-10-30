@@ -212,9 +212,9 @@ class ViolenceDetector:
 
         self.model = model
         self.backend_type = f"pytorch_{self.device.type if hasattr(self.device, 'type') else self.device}"
-        self.model_name = "R(2+1)D-18 High-Accuracy (RWF-2000)"
-        self.num_frames = 32
-        self.confidence_threshold = 0.50
+        self.model_name = "R(2+1)D-18 Fine-Tuned (VisionSense Surveillance)" if "finetuned" in pt_path else "R(2+1)D-18 High-Accuracy (RWF-2000)"
+        self.num_frames = ckpt.get("num_frames", 16) if isinstance(ckpt, dict) else 16
+        self.confidence_threshold = 0.45
         self.is_ready = True
         self.init_error = None
         print(f"[ViolenceDetector] Loaded {self.model_name} on {self.backend_type}")
@@ -244,6 +244,15 @@ class ViolenceDetector:
         self.is_ready = True
         self.init_error = None
         print(f"[ViolenceDetector] Loaded {self.model_name} with provider {self.backend_type}")
+
+    def reset(self):
+        """Resets all rolling buffers and temporal debouncing state when switching video streams."""
+        self.frame_buffer.clear()
+        self.time_buffer.clear()
+        self.active_state = "NORMAL"
+        self.consecutive_violent_windows = 0
+        self.consecutive_normal_windows = 0
+        self.last_event_time = 0.0
 
     def get_status(self) -> Dict[str, Any]:
         """Returns health status and metadata for dashboard."""
@@ -489,7 +498,8 @@ class ViolenceDetector:
         frame: np.ndarray,
         timestamp: float,
         source_id: str = "camera_stream",
-        stride_frames: int = 8
+        stride_frames: int = 8,
+        tracks: Optional[List[Dict[str, Any]]] = None
     ) -> Tuple[Optional[ViolencePrediction], Optional[str]]:
         """
         Ingests a frame into the sliding window queue.
@@ -522,7 +532,7 @@ class ViolenceDetector:
         recent_frames = [buf_frames[i] for i in sampled_indices]
         recent_times = [buf_times[i] for i in sampled_indices]
 
-        pred = self.predict_clip(recent_frames, recent_times, source_id=source_id)
+        pred = self.predict_clip(recent_frames, recent_times, source_id=source_id, tracks=tracks)
         event_trigger = None
 
         if pred.is_violence:

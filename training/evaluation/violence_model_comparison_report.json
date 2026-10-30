@@ -1,0 +1,374 @@
+{
+  "baseline": {
+    "model_name": "R(2+1)D-18 Baseline (RWF-2000 Prior)",
+    "checkpoint": "D:\\spidy\\YOLO\\training\\checkpoints\\violence_r2plus1d_finetuned_backup.pt",
+    "sample_count": 17,
+    "confusion_matrix": {
+      "true_positives": 4,
+      "true_negatives": 4,
+      "false_positives": 3,
+      "false_negatives": 6
+    },
+    "metrics": {
+      "accuracy": 0.4706,
+      "precision": 0.5714,
+      "recall": 0.4,
+      "f1_score": 0.4706,
+      "false_positive_rate": 0.4286,
+      "false_negative_rate": 0.6
+    },
+    "performance": {
+      "mean_latency_ms": 185.23,
+      "p95_latency_ms": 187.55,
+      "throughput_fps": 86.4,
+      "vram_allocated_mb": 516.5
+    },
+    "category_accuracy": {
+      "violent_physical": 0.4,
+      "nonviolent_challenge": 0.5714,
+      "cam1_front": 0.5,
+      "cam2_fisheye": 0.375
+    },
+    "per_clip_results": [
+      {
+        "filename": "violent_ev015_cam1.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.8594,
+        "correct": true,
+        "camera": "cam1",
+        "latency_ms": 196.92
+      },
+      {
+        "filename": "violent_ev015_cam2.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.0252,
+        "correct": false,
+        "camera": "cam2",
+        "latency_ms": 184.68
+      },
+      {
+        "filename": "violent_ev016_cam1.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.0274,
+        "correct": false,
+        "camera": "cam1",
+        "latency_ms": 184.24
+      },
+      {
+        "filename": "violent_ev016_cam2.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.0701,
+        "correct": false,
+        "camera": "cam2",
+        "latency_ms": 184.43
+      },
+      {
+        "filename": "violent_ev018_cam1.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.6794,
+        "correct": true,
+        "camera": "cam1",
+        "latency_ms": 184.42
+      },
+      {
+        "filename": "violent_ev018_cam2.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.1104,
+        "correct": false,
+        "camera": "cam2",
+        "latency_ms": 184.45
+      },
+      {
+        "filename": "violent_ev002_cam1.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.9044,
+        "correct": true,
+        "camera": "cam1",
+        "latency_ms": 184.48
+      },
+      {
+        "filename": "violent_ev002_cam2.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.6146,
+        "correct": true,
+        "camera": "cam2",
+        "latency_ms": 184.34
+      },
+      {
+        "filename": "violent_ev008_cam1.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.4317,
+        "correct": false,
+        "camera": "cam1",
+        "latency_ms": 184.3
+      },
+      {
+        "filename": "violent_ev008_cam2.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.0596,
+        "correct": false,
+        "camera": "cam2",
+        "latency_ms": 184.27
+      },
+      {
+        "filename": "retail_counter.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.4055,
+        "correct": true,
+        "camera": "cctv_fixed",
+        "latency_ms": 184.34
+      },
+      {
+        "filename": "nonviolent_ev012_cam1.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.5784,
+        "correct": false,
+        "camera": "cam1",
+        "latency_ms": 184.94
+      },
+      {
+        "filename": "nonviolent_ev012_cam2.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.1365,
+        "correct": true,
+        "camera": "cam2",
+        "latency_ms": 184.5
+      },
+      {
+        "filename": "nonviolent_ev004_cam1.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.8664,
+        "correct": false,
+        "camera": "cam1",
+        "latency_ms": 184.29
+      },
+      {
+        "filename": "nonviolent_ev004_cam2.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.5941,
+        "correct": false,
+        "camera": "cam2",
+        "latency_ms": 184.64
+      },
+      {
+        "filename": "nonviolent_ev013_cam1.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.0522,
+        "correct": true,
+        "camera": "cam1",
+        "latency_ms": 185.21
+      },
+      {
+        "filename": "nonviolent_ev013_cam2.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.1954,
+        "correct": true,
+        "camera": "cam2",
+        "latency_ms": 184.54
+      }
+    ]
+  },
+  "candidate_finetuned": {
+    "model_name": "R(2+1)D-18 Fine-Tuned (VisionSense Real Surveillance)",
+    "checkpoint": "D:\\spidy\\YOLO\\training\\checkpoints\\violence_r2plus1d_finetuned.pt",
+    "sample_count": 17,
+    "confusion_matrix": {
+      "true_positives": 9,
+      "true_negatives": 5,
+      "false_positives": 2,
+      "false_negatives": 1
+    },
+    "metrics": {
+      "accuracy": 0.8235,
+      "precision": 0.8182,
+      "recall": 0.9,
+      "f1_score": 0.8571,
+      "false_positive_rate": 0.2857,
+      "false_negative_rate": 0.1
+    },
+    "performance": {
+      "mean_latency_ms": 184.53,
+      "p95_latency_ms": 185.1,
+      "throughput_fps": 86.7,
+      "vram_allocated_mb": 516.5
+    },
+    "category_accuracy": {
+      "violent_physical": 0.9,
+      "nonviolent_challenge": 0.7143,
+      "cam1_front": 0.75,
+      "cam2_fisheye": 0.875
+    },
+    "per_clip_results": [
+      {
+        "filename": "violent_ev015_cam1.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.8911,
+        "correct": true,
+        "camera": "cam1",
+        "latency_ms": 184.39
+      },
+      {
+        "filename": "violent_ev015_cam2.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.7826,
+        "correct": true,
+        "camera": "cam2",
+        "latency_ms": 184.32
+      },
+      {
+        "filename": "violent_ev016_cam1.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.8449,
+        "correct": true,
+        "camera": "cam1",
+        "latency_ms": 184.38
+      },
+      {
+        "filename": "violent_ev016_cam2.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.8832,
+        "correct": true,
+        "camera": "cam2",
+        "latency_ms": 184.53
+      },
+      {
+        "filename": "violent_ev018_cam1.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.8231,
+        "correct": true,
+        "camera": "cam1",
+        "latency_ms": 185.08
+      },
+      {
+        "filename": "violent_ev018_cam2.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.7876,
+        "correct": true,
+        "camera": "cam2",
+        "latency_ms": 185.16
+      },
+      {
+        "filename": "violent_ev002_cam1.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.458,
+        "correct": false,
+        "camera": "cam1",
+        "latency_ms": 184.33
+      },
+      {
+        "filename": "violent_ev002_cam2.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.7256,
+        "correct": true,
+        "camera": "cam2",
+        "latency_ms": 184.38
+      },
+      {
+        "filename": "violent_ev008_cam1.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.6726,
+        "correct": true,
+        "camera": "cam1",
+        "latency_ms": 184.45
+      },
+      {
+        "filename": "violent_ev008_cam2.mp4",
+        "ground_truth": "VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.7252,
+        "correct": true,
+        "camera": "cam2",
+        "latency_ms": 184.37
+      },
+      {
+        "filename": "retail_counter.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.0504,
+        "correct": true,
+        "camera": "cctv_fixed",
+        "latency_ms": 184.87
+      },
+      {
+        "filename": "nonviolent_ev012_cam1.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.5972,
+        "correct": false,
+        "camera": "cam1",
+        "latency_ms": 184.73
+      },
+      {
+        "filename": "nonviolent_ev012_cam2.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "VIOLENCE",
+        "p_violence": 0.5656,
+        "correct": false,
+        "camera": "cam2",
+        "latency_ms": 184.22
+      },
+      {
+        "filename": "nonviolent_ev004_cam1.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.3564,
+        "correct": true,
+        "camera": "cam1",
+        "latency_ms": 184.4
+      },
+      {
+        "filename": "nonviolent_ev004_cam2.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.0399,
+        "correct": true,
+        "camera": "cam2",
+        "latency_ms": 184.29
+      },
+      {
+        "filename": "nonviolent_ev013_cam1.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.2954,
+        "correct": true,
+        "camera": "cam1",
+        "latency_ms": 184.5
+      },
+      {
+        "filename": "nonviolent_ev013_cam2.mp4",
+        "ground_truth": "NON_VIOLENCE",
+        "predicted": "NON_VIOLENCE",
+        "p_violence": 0.258,
+        "correct": true,
+        "camera": "cam2",
+        "latency_ms": 184.63
+      }
+    ]
+  }
+}

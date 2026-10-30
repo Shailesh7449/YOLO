@@ -31,6 +31,9 @@ class TrackedPerson:
     centroid: List[float]  # [cx, cy]
     velocity: List[float] = field(default_factory=lambda: [0.0, 0.0])
     stationary_frames: int = 0
+    is_violence_participant: bool = False
+    participant_role: str = "BYSTANDER"
+    violence_association_conf: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

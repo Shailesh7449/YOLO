@@ -130,6 +130,9 @@ def analyze_video_file(
         except Exception as e:
             print(f"[Pipeline] ViolenceDetector initialization skipped: {e}")
 
+    if violence_det is not None:
+        violence_det.reset()
+
     telemetry_frames: List[Dict[str, Any]] = []
     frame_idx = 0
     processed_count = 0
@@ -165,12 +168,34 @@ def analyze_video_file(
             # Ingest frame into video-action violence detector
             v_pred = None
             if violence_det is not None:
+                track_dicts = [t.to_dict() for t in tracked_persons]
                 v_pred, v_trigger = violence_det.ingest_stream_frame(
                     frame,
                     timestamp=current_timestamp,
                     source_id=os.path.basename(video_path),
-                    stride_frames=frame_stride
+                    stride_frames=frame_stride,
+                    tracks=track_dicts
                 )
+                # Dynamic Red/Blue Participant Assignment:
+                # Active altercation participants marked is_violence_participant = True (RED)
+                # Bystanders / normal pedestrians retain is_violence_participant = False (BLUE)
+                if v_pred and v_pred.participant_track_ids and v_pred.is_violence:
+                    participant_set = set(v_pred.participant_track_ids)
+                    for t in tracked_persons:
+                        if t.track_id in participant_set:
+                            t.is_violence_participant = True
+                            t.participant_role = "POTENTIAL VIOLENCE PARTICIPANT"
+                            t.violence_association_conf = 0.90
+                        else:
+                            t.is_violence_participant = False
+                            t.participant_role = "BYSTANDER"
+                            t.violence_association_conf = 0.10
+                else:
+                    for t in tracked_persons:
+                        t.is_violence_participant = False
+                        t.participant_role = "BYSTANDER"
+                        t.violence_association_conf = 0.0
+
                 if v_trigger == "VIOLENCE_INCIDENT_STARTED" and v_pred is not None:
                     minutes = int(current_timestamp // 60)
                     seconds = int(current_timestamp % 60)
